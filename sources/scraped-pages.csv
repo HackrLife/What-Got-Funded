@@ -1,0 +1,12 @@
+source,market,page_url,apify_actor,settings,test_result,notes,last_tested
+Dealroom News,Pan-Europe,https://dealroom.co/news,apify/web-fetch,wait=5000,good,~90 rounds/week tagged Fundraise; filter out fund closes and debt,2026-10-11
+PEdaily / 投资界,China,https://www.pedaily.cn/weeklyinvest/,apify/web-fetch,,good,Dated weekly list; archive at /weeklyinvest/YYYYMMDD/,2026-10-11
+Unicorn Factory (MoneyToday),South Korea,https://www.unicornfactory.co.kr/money/investment,apify/web-fetch,wait=5000,good,Renders empty without wait,2026-10-11
+Startupbusiness,Italy,https://www.startupbusiness.it/funding-news/,apify/web-fetch,,good,Italian month names in dates; paginated /page/N/,2026-10-11
+CTech by Calcalist,Israel,https://www.calcalistech.com/ctechnews/article/rq8lzbs4c,apify/web-fetch,wait=5000,good,Running list of 2026 Israeli rounds; category pages mix other news,2026-10-11
+KrASIA,Pan-APAC,https://kr-asia.com/topic/venture-capital,apify/web-fetch,,usable,Weekly Deals in brief roundups; open each article; undated listing,2026-10-11
+The Kenyan Wall Street,Kenya,https://kenyanwallstreet.com/category/startups/,apify/web-fetch,,usable,Relative dates only; 1-2 rounds a month,2026-10-11
+Arab News – Startup Wrap,Pan-MENA,https://www.arabnews.com/startups,apify/web-fetch,,usable,Extract rounds from weekly Startup Wrap articles,2026-10-11
+Vestbee,CEE regional,https://vestbee.com/insights/category/deals,apify/web-fetch,,to test,Hub page /blog shows only 4 deals; deals category untested,2026-10-11
+EnterpriseAM Egypt,Egypt,https://enterpriseam.com/category/startups/,apify/web-fetch,,to test,Startups block on /egypt/startups/ was 3 weeks stale,2026-10-11
+Cyzone / 创业邦,China,,apify/web-fetch,,broken,Funding label page returns 404; needs a new URL,2026-10-11

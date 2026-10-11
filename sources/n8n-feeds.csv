@@ -1,0 +1,204 @@
+region,market,source,language,priority,feed_status,feed_url
+Global,Global,Crunchbase News,English,1,verified,https://news.crunchbase.com/feed/
+Global,Global,TechCrunch – Venture,English,1,verified,https://techcrunch.com/category/venture/feed/
+APAC,Pan-APAC,Techloy – Tech in Asia channel,English,1,verified,https://www.techloy.com/tag/asia/rss/
+APAC,Pan-APAC,PR Newswire APAC – Venture Capital,English,1,verified,https://www.prnewswire.com/apac/rss/financial-services-latest-news/venture-capital-list.rss
+APAC,Pan-APAC,TNGlobal (TechNode Global),English,2,verified,https://technode.global/category/industry/investments/feed/
+APAC,India,Inc42 – Funding Galore,English,1,verified,https://inc42.com/tag/funding-galore/feed/
+APAC,India,Entrackr,English,1,verified,https://entrackr.com/rss
+APAC,India,YourStory,English,1,verified,https://yourstory.com/feed
+APAC,India,Indian Startup News,English,1,verified,https://indianstartupnews.com/rss
+APAC,India,TechCrunch – India tag,English,2,verified,https://techcrunch.com/tag/india/feed/
+APAC,Australia,Startup Daily,English,1,verified,https://www.startupdaily.net/topic/funding/feed/
+APAC,Australia,SmartCompany – StartupSmart,English,1,verified,https://www.smartcompany.com.au/startupsmart/feed/
+APAC,Australia,InnovationAus,English,2,verified,https://www.innovationaus.com/feed/
+APAC,Australia,IT Brief Australia,English,2,verified,https://itbrief.com.au/feed
+APAC,New Zealand,Startup Daily – NZ tag,English,1,verified,https://www.startupdaily.net/tag/new-zealand/feed/
+APAC,New Zealand,Idealog – startups,English,2,verified,https://www.idealog.co.nz/tag/startups/feed
+APAC,Singapore,Fintech News Singapore,English,1,verified,https://fintechnews.sg/funding/feed/
+APAC,Singapore,Vulcan Post,English,2,verified,https://vulcanpost.com/feed/
+APAC,Singapore,Tech Collective SEA,English,2,verified,https://techcollectivesea.com/feed/
+APAC,Indonesia,DailySocial.id (RISE),Bahasa Indonesia / English,1,verified,https://dailysocial.id/feed
+APAC,Indonesia,CNBC Indonesia – Tech,Bahasa Indonesia,2,verified,https://www.cnbcindonesia.com/tech/rss
+APAC,Indonesia,ANTARA News,Bahasa Indonesia,2,verified,https://www.antaranews.com/rss/ekonomi-bisnis.xml
+APAC,Malaysia,Fintech News Malaysia,English,1,verified,https://fintechnews.my/funding/feed/
+APAC,Malaysia,Vulcan Post – News,English,2,verified,https://vulcanpost.com/category/news/feed/
+APAC,Malaysia,Business Today Malaysia,English,2,verified,https://www.businesstoday.com.my/feed/
+APAC,Malaysia,Utusan Malaysia,Bahasa Malaysia,2,verified,https://www.utusan.com.my/feed/
+APAC,Malaysia,BERNAMA,English / Bahasa Malaysia,2,verified,https://www.bernama.com/en/rssfeed.php
+APAC,Vietnam,VnExpress International – Business,English,2,verified,https://e.vnexpress.net/rss/business.rss
+APAC,Vietnam,VnExpress – Kinh doanh,Vietnamese,2,verified,https://vnexpress.net/rss/kinh-doanh.rss
+APAC,Vietnam,Vietcetera,English / Vietnamese,2,verified,https://vietcetera.com/rss-en.xml
+APAC,Thailand,Techsauce,Thai / English,2,verified,https://techsauce.co/feed
+APAC,Thailand,Brand Inside,Thai,2,verified,https://brandinside.asia/feed/
+APAC,Thailand,THE STANDARD,Thai,2,verified,https://thestandard.co/feed/
+APAC,Thailand,Prachachat Turakij,Thai,2,verified,https://www.prachachat.net/feed
+APAC,Thailand,ThaiPR.net (wire),Thai / English,2,verified,https://www.thaipr.net/feed
+APAC,Philippines,Fintech News Philippines,English,1,verified,https://fintechnews.ph/funding/feed/
+APAC,Philippines,The Independent Investor,English,2,verified,https://theindependentinvestor.ph/feed/
+APAC,Philippines,BitPinas – Business,English / Filipino,2,verified,https://bitpinas.com/category/business/feed/
+APAC,Philippines,Inquirer Business,English,2,verified,https://business.inquirer.net/feed
+APAC,Philippines,GMA News – Money,English / Filipino,2,verified,https://data.gmanetwork.com/gno/rss/money/feed.xml
+APAC,Philippines,Philstar – Business,English,2,verified,https://www.philstar.com/rss/business
+APAC,Japan,PR TIMES,Japanese,1,verified,https://prtimes.jp/index.rdf
+APAC,Japan,BRIDGE – fundraise tag,Japanese,1,verified,https://thebridge.jp/tag/fundraise/feed
+APAC,Japan,BRIDGE English,English,1,verified,https://thebridge.jp/en/feed
+APAC,South Korea,Startup Recipe,Korean,1,verified,https://startuprecipe.co.kr/feed
+APAC,South Korea,KoreaTechDesk – Investments,English,1,verified,https://koreatechdesk.com/category/startup/investments/feed
+APAC,South Korea,Venture Square,Korean,2,verified,https://www.venturesquare.net/feed
+APAC,South Korea,beSUCCESS,Korean,2,verified,https://www.besuccess.com/feed/
+APAC,South Korea,KED Global,English,2,verified,https://www.kedglobal.com/rss
+APAC,China,36Kr,Simplified Chinese,1,verified,https://36kr.com/feed
+APAC,China,TMTPost,Simplified Chinese,2,verified,https://www.tmtpost.com/rss.xml
+APAC,China,TechNode,English,2,verified,https://technode.com/feed/
+APAC,Taiwan,Meet創業小聚,Traditional Chinese,1,verified,https://rss.bnextmedia.com.tw/feed/meet/rss
+APAC,Taiwan,INSIDE,Traditional Chinese,2,verified,https://www.inside.com.tw/feed/rss
+APAC,Taiwan,數位時代 BusinessNext,Traditional Chinese,2,verified,https://rss.bnextmedia.com.tw/feed/bnext/rss
+APAC,Taiwan,TechOrange,Traditional Chinese,2,verified,https://www.techorange.com/feed/
+APAC,Taiwan,TechNews 科技新報,Traditional Chinese,2,verified,https://cdn.technews.tw/feed/
+APAC,Hong Kong,SCMP – Tech,English,2,verified,https://www.scmp.com/rss/36/feed
+APAC,Hong Kong,Fintech News Hong Kong,English,2,verified,https://fintechnews.hk/feed/
+APAC,Hong Kong,unwire.pro,Traditional Chinese,2,verified,https://unwire.pro/feed/
+Europe,Pan-Europe,EU-Startups,English,1,verified,https://www.eu-startups.com/category/fundin/feed/
+Europe,Pan-Europe,Tech.eu,English,1,verified,https://tech.eu/feed/
+Europe,Pan-Europe,Sifted,English,1,verified,https://sifted.eu/feed
+Europe,Pan-Europe,FinSMEs,English,1,verified,https://www.finsmes.com/feed
+Europe,United Kingdom,Tech Funding News,English,1,verified,https://techfundingnews.com/category/funding/feed/
+Europe,United Kingdom,BusinessCloud,English,1,verified,https://businesscloud.co.uk/feed/
+Europe,United Kingdom,Startups Magazine,English,1,verified,https://startupsmagazine.co.uk/rss
+Europe,United Kingdom,Maddyness UK,English,2,verified,https://www.maddyness.com/uk/feed/
+Europe,United Kingdom,City AM – Tech,English,2,verified,https://www.cityam.com/category/technology/feed/
+Europe,United Kingdom,TechRound,English,2,verified,https://techround.co.uk/feed/
+Europe,United Kingdom,Scottish Business News,English,2,verified,https://www.scottishbusinessnews.net/feed/
+Europe,United Kingdom,Business News Wales,English,2,verified,https://businessnewswales.com/feed/
+Europe,United Kingdom,Pressat (wire),English,2,verified,https://www.pressat.co.uk/rss/
+Europe,United Kingdom,PR Newswire UK (wire),English,2,verified,https://www.prnewswire.co.uk/rss/news-releases-list.rss
+Europe,Ireland,Silicon Republic,English,1,verified,https://www.siliconrepublic.com/feed
+Europe,Ireland,Irish Tech News,English,2,verified,https://irishtechnews.ie/feed/
+Europe,Ireland,The Irish Times – Business,English,2,verified,https://www.irishtimes.com/arc/outboundfeeds/feed-business/?outputType=xml
+Europe,Ireland,The Currency,English,2,verified,https://www.thecurrency.news/feed/
+Europe,Ireland,TechCentral.ie,English,2,verified,https://www.techcentral.ie/feed/
+Europe,Germany,deutsche-startups.de,German,1,verified,https://www.deutsche-startups.de/feed/
+Europe,Germany,Startbase,German,1,verified,https://www.startbase.de/feed/
+Europe,Austria,brutkasten,German,1,verified,https://brutkasten.com/feed/
+Europe,Austria,APA-OTS (wire),German,2,verified,https://www.ots.at/rss/index
+Europe,Switzerland,Startupticker.ch,English / German / French,1,verified,https://www.startupticker.ch/en/rss/news
+Europe,Switzerland,Netzwoche,German,2,verified,https://www.netzwoche.ch/taxonomy/term/31/feed
+Europe,France,Maddyness,French,1,verified,https://www.maddyness.com/feed/
+Europe,France,FrenchWeb,French,1,verified,https://www.frenchweb.fr/feed
+Europe,Netherlands,Emerce,Dutch,2,verified,https://www.emerce.nl/rss
+Europe,Netherlands,MT/Sprout,Dutch,2,verified,https://mtsprout.nl/feed
+Europe,Netherlands,IO+,Dutch / English,2,verified,https://ioplus.nl/feed/
+Europe,Belgium,Forbes Belgium,Dutch / French,2,verified,https://www.forbes.be/nl/feed/
+Europe,Belgium,Business AM,French / Dutch,2,verified,https://fr.businessam.be/feed/
+Europe,Sweden,Realtid,Swedish,2,verified,https://www.realtid.se/feed/
+Europe,Denmark,TechSavvy,Danish,1,verified,https://techsavvy.media/feed/
+Europe,Denmark,Øresund Startup News,English,2,verified,https://oresundstartups.com/feed/
+Europe,Denmark,Computerworld DK,Danish,2,verified,https://www.computerworld.dk/rss/all
+Europe,Finland,ArcticStartup – Funding,English,1,verified,https://arcticstartup.com/category/funding/feed/
+Europe,Spain,El Referente,Spanish,1,verified,https://elreferente.es/feed/
+Europe,Spain,Emprendedores,Spanish,1,verified,https://www.emprendedores.es/feed/
+Europe,Spain,El Español – Disruptores,Spanish,2,verified,https://www.elespanol.com/rss/invertia/disruptores/
+Europe,Portugal,ECO,Portuguese,2,verified,https://eco.sapo.pt/feed/
+Europe,Portugal,Observador,Portuguese,2,verified,https://observador.pt/rss/
+Europe,Portugal,Dinheiro Vivo,Portuguese,2,verified,https://dinheirovivo.dn.pt/stories.rss
+Europe,Italy,StartupItalia – That's Round,Italian,1,verified,https://startupitalia.eu/tag/round/feed/
+Europe,Poland,MamStartup,Polish,1,verified,https://mamstartup.pl/feed/
+Europe,Poland,The Recursive – Poland,English,1,verified,https://www.therecursive.com/tag/poland/rss/
+Europe,Czech Republic,CzechCrunch (cc.cz),Czech,2,verified,https://cc.cz/startupy/feed/
+Europe,Czech Republic,Forbes Česko,Czech,2,verified,https://forbes.cz/feed/
+Europe,Estonia,ArcticStartup – Estonia,English,1,verified,https://arcticstartup.com/tag/estonia/feed/
+Europe,Estonia,ERR News,English,2,verified,https://news.err.ee/rss
+Europe,Estonia,Startup Estonia,English,2,verified,https://startupestonia.ee/feed/
+Europe,Latvia,ArcticStartup – Latvia,English,1,verified,https://arcticstartup.com/tag/latvia/feed/
+Europe,Lithuania,ArcticStartup – Lithuania,English,1,verified,https://arcticstartup.com/tag/lithuania/feed/
+Europe,Romania,The Recursive – Romania,English,1,verified,https://www.therecursive.com/tag/romania/rss/
+Europe,Romania,start-up.ro,Romanian,2,verified,https://www.start-up.ro/feed/
+Europe,Romania,StartupCafe,Romanian,2,verified,https://www.startupcafe.ro/rss
+Europe,CEE regional,The Recursive – Deals,English,1,verified,https://www.therecursive.com/tag/deals/rss/
+Europe,CEE regional,Emerging Europe,English,2,verified,https://emerging-europe.com/feed/
+Europe,Croatia,Netokracija – Startupi,Croatian,2,verified,https://www.netokracija.com/poslovanje-i-startupi/startupi/feed
+Europe,Hungary,The Recursive – Hungary,English,1,verified,https://www.therecursive.com/tag/hungary/rss/
+Europe,Greece,Startupper,Greek,2,verified,https://www.startupper.gr/feed/
+Americas,United States,PitchBook News,English,1,verified,https://pitchbook.com/tag/exclusive.rss
+Americas,United States,AlleyWatch (New York),English,1,unverified,https://www.alleywatch.com/category/startups/feed/
+Americas,United States,GeekWire (Seattle),English,1,unverified,https://www.geekwire.com/startups/feed/
+Americas,Canada,BetaKit,English,1,unverified,https://betakit.com/feed/
+Americas,Brazil,Startups.com.br,Portuguese,1,unverified,https://startups.com.br/tag/rodada-de-investimento/feed/
+Americas,Brazil,NeoFeed,Portuguese,2,verified,https://neofeed.com.br/feed/
+Americas,Brazil,Brazil Journal,Portuguese,2,verified,https://braziljournal.com/rss
+Americas,Argentina,iProUP,Spanish,1,unverified,https://www.iproup.com/rss/startups
+Africa,Pan-Africa,TechCabal,English,1,verified,https://techcabal.com/feed/
+Africa,Pan-Africa,Disrupt Africa,English,1,unverified,https://disruptafrica.com/feed/
+Africa,Pan-Africa,Africa: The Big Deal,English,1,unverified,https://thebigdeal.substack.com/feed
+Africa,Nigeria,Techpoint Africa,English,2,verified,https://techpoint.africa/feed/
+Africa,South Africa,TechCentral,English,1,unverified,https://techcentral.co.za/feed/
+Middle East,Pan-MENA,Wamda,English / Arabic,1,unverified,https://www.wamda.com/feed
+Middle East,Israel,Globes – Start-ups and VC,English,1,unverified,https://www.globes.co.il/WebService/Rss/RssFeeder.asmx/FeederKeyword?iID=1397
+Middle East,Israel,Times of Israel – Tech Israel,English,2,unverified,https://www.timesofisrael.com/techisraelfeed/
+Middle East,Turkey,Webrazzi,Turkish,1,verified,https://webrazzi.com/feed/
+APAC,Japan,Google News: 資金調達 シリーズ,Japanese,2,google news,https://news.google.com/rss/search?q=%E8%B3%87%E9%87%91%E8%AA%BF%E9%81%94%20%E3%82%B7%E3%83%AA%E3%83%BC%E3%82%BA%20when%3A7d&hl=ja&gl=JP&ceid=JP:ja
+APAC,Japan,Google News: 資金調達 シード,Japanese,2,google news,https://news.google.com/rss/search?q=%E8%B3%87%E9%87%91%E8%AA%BF%E9%81%94%20%E3%82%B7%E3%83%BC%E3%83%89%20when%3A7d&hl=ja&gl=JP&ceid=JP:ja
+APAC,South Korea,Google News: 투자 유치 시리즈,Korean,2,google news,https://news.google.com/rss/search?q=%ED%88%AC%EC%9E%90%20%EC%9C%A0%EC%B9%98%20%EC%8B%9C%EB%A6%AC%EC%A6%88%20when%3A7d&hl=ko&gl=KR&ceid=KR:ko
+APAC,South Korea,Google News: 시드 투자 유치,Korean,2,google news,https://news.google.com/rss/search?q=%EC%8B%9C%EB%93%9C%20%ED%88%AC%EC%9E%90%20%EC%9C%A0%EC%B9%98%20when%3A7d&hl=ko&gl=KR&ceid=KR:ko
+APAC,China,Google News: 完成 融资 A轮,Simplified Chinese,2,google news,https://news.google.com/rss/search?q=%E5%AE%8C%E6%88%90%20%E8%9E%8D%E8%B5%84%20A%E8%BD%AE%20when%3A7d&hl=zh-CN&gl=CN&ceid=CN:zh-Hans
+APAC,China,Google News: 天使轮 融资,Simplified Chinese,2,google news,https://news.google.com/rss/search?q=%E5%A4%A9%E4%BD%BF%E8%BD%AE%20%E8%9E%8D%E8%B5%84%20when%3A7d&hl=zh-CN&gl=CN&ceid=CN:zh-Hans
+APAC,Taiwan,Google News: 新創 完成 融資,Traditional Chinese,2,google news,https://news.google.com/rss/search?q=%E6%96%B0%E5%89%B5%20%E5%AE%8C%E6%88%90%20%E8%9E%8D%E8%B3%87%20when%3A7d&hl=zh-TW&gl=TW&ceid=TW:zh-Hant
+APAC,Hong Kong,Google News: 初創 融資,Traditional Chinese,2,google news,https://news.google.com/rss/search?q=%E5%88%9D%E5%89%B5%20%E8%9E%8D%E8%B3%87%20when%3A7d&hl=zh-HK&gl=HK&ceid=HK:zh-Hant
+APAC,Indonesia,Google News: startup pendanaan seri,Bahasa Indonesia,2,google news,https://news.google.com/rss/search?q=startup%20pendanaan%20seri%20when%3A7d&hl=id&gl=ID&ceid=ID:id
+APAC,Malaysia,Google News: syarikat permulaan pembiayaan,Bahasa Malaysia,2,google news,https://news.google.com/rss/search?q=syarikat%20permulaan%20pembiayaan%20when%3A7d&hl=ms&gl=MY&ceid=MY:ms
+APAC,Vietnam,Google News: startup gọi vốn vòng,Vietnamese,2,google news,https://news.google.com/rss/search?q=startup%20g%E1%BB%8Di%20v%E1%BB%91n%20v%C3%B2ng%20when%3A7d&hl=vi&gl=VN&ceid=VN:vi
+APAC,Thailand,Google News: สตาร์ทอัพ ระดมทุน ซีรีส์,Thai,2,google news,https://news.google.com/rss/search?q=%E0%B8%AA%E0%B8%95%E0%B8%B2%E0%B8%A3%E0%B9%8C%E0%B8%97%E0%B8%AD%E0%B8%B1%E0%B8%9E%20%E0%B8%A3%E0%B8%B0%E0%B8%94%E0%B8%A1%E0%B8%97%E0%B8%B8%E0%B8%99%20%E0%B8%8B%E0%B8%B5%E0%B8%A3%E0%B8%B5%E0%B8%AA%E0%B9%8C%20when%3A7d&hl=th&gl=TH&ceid=TH:th
+APAC,India,Google News: startup raises Series funding,English,2,google news,https://news.google.com/rss/search?q=startup%20raises%20Series%20funding%20when%3A7d&hl=en-IN&gl=IN&ceid=IN:en
+APAC,Australia,Google News: startup raises seed Series,English,2,google news,https://news.google.com/rss/search?q=startup%20raises%20seed%20Series%20when%3A7d&hl=en-AU&gl=AU&ceid=AU:en
+APAC,New Zealand,Google News: startup raises funding,English,2,google news,https://news.google.com/rss/search?q=startup%20raises%20funding%20when%3A7d&hl=en-NZ&gl=NZ&ceid=NZ:en
+APAC,Singapore,Google News: startup raises Series funding,English,2,google news,https://news.google.com/rss/search?q=startup%20raises%20Series%20funding%20when%3A7d&hl=en-SG&gl=SG&ceid=SG:en
+APAC,Philippines,Google News: startup raises funding,English,2,google news,https://news.google.com/rss/search?q=startup%20raises%20funding%20when%3A7d&hl=en-PH&gl=PH&ceid=PH:en
+APAC,Malaysia,Google News: startup raises funding,English,2,google news,https://news.google.com/rss/search?q=startup%20raises%20funding%20when%3A7d&hl=en-MY&gl=MY&ceid=MY:en
+Europe,United Kingdom,Google News: startup raises seed Series A,English,2,google news,https://news.google.com/rss/search?q=startup%20raises%20seed%20Series%20A%20when%3A7d&hl=en-GB&gl=GB&ceid=GB:en
+Europe,Ireland,Google News: startup raises funding,English,2,google news,https://news.google.com/rss/search?q=startup%20raises%20funding%20when%3A7d&hl=en-IE&gl=IE&ceid=IE:en
+Europe,Germany,Google News: Startup Finanzierungsrunde Millionen,German,2,google news,https://news.google.com/rss/search?q=Startup%20Finanzierungsrunde%20Millionen%20when%3A7d&hl=de&gl=DE&ceid=DE:de
+Europe,Austria,Google News: Startup Finanzierungsrunde,German,2,google news,https://news.google.com/rss/search?q=Startup%20Finanzierungsrunde%20when%3A7d&hl=de&gl=AT&ceid=AT:de
+Europe,Switzerland,Google News: Startup Finanzierungsrunde,German,2,google news,https://news.google.com/rss/search?q=Startup%20Finanzierungsrunde%20when%3A7d&hl=de&gl=CH&ceid=CH:de
+Europe,Switzerland,Google News: start-up lève millions,French,2,google news,https://news.google.com/rss/search?q=start-up%20l%C3%A8ve%20millions%20when%3A7d&hl=fr&gl=CH&ceid=CH:fr
+Europe,France,Google News: start-up lève millions d'euros,French,2,google news,https://news.google.com/rss/search?q=start-up%20l%C3%A8ve%20millions%20d%27euros%20when%3A7d&hl=fr&gl=FR&ceid=FR:fr
+Europe,Belgium,Google News: start-up lève millions,French,2,google news,https://news.google.com/rss/search?q=start-up%20l%C3%A8ve%20millions%20when%3A7d&hl=fr&gl=BE&ceid=BE:fr
+Europe,Belgium,Google News: startup haalt miljoen op,Dutch,2,google news,https://news.google.com/rss/search?q=startup%20haalt%20miljoen%20op%20when%3A7d&hl=nl&gl=BE&ceid=BE:nl
+Europe,Netherlands,Google News: startup haalt miljoen op,Dutch,2,google news,https://news.google.com/rss/search?q=startup%20haalt%20miljoen%20op%20when%3A7d&hl=nl&gl=NL&ceid=NL:nl
+Europe,Sweden,Google News: startup tar in miljoner,Swedish,2,google news,https://news.google.com/rss/search?q=startup%20tar%20in%20miljoner%20when%3A7d&hl=sv&gl=SE&ceid=SE:sv
+Europe,Norway,Google News: oppstartsselskap henter millioner,Norwegian,2,google news,https://news.google.com/rss/search?q=oppstartsselskap%20henter%20millioner%20when%3A7d&hl=no&gl=NO&ceid=NO:no
+Europe,Denmark,Google News: startup rejser millioner,Danish,2,google news,https://news.google.com/rss/search?q=startup%20rejser%20millioner%20when%3A7d&hl=da&gl=DK&ceid=DK:da
+Europe,Finland,Google News: startup kerää rahoitusta,Finnish,2,google news,https://news.google.com/rss/search?q=startup%20ker%C3%A4%C3%A4%20rahoitusta%20when%3A7d&hl=fi&gl=FI&ceid=FI:fi
+Europe,Spain,Google News: startup ronda de financiación,Spanish,2,google news,https://news.google.com/rss/search?q=startup%20ronda%20de%20financiaci%C3%B3n%20when%3A7d&hl=es&gl=ES&ceid=ES:es
+Europe,Portugal,Google News: startup ronda de investimento,Portuguese,2,google news,https://news.google.com/rss/search?q=startup%20ronda%20de%20investimento%20when%3A7d&hl=pt-PT&gl=PT&ceid=PT:pt-150
+Europe,Italy,Google News: startup round milioni,Italian,2,google news,https://news.google.com/rss/search?q=startup%20round%20milioni%20when%3A7d&hl=it&gl=IT&ceid=IT:it
+Europe,Poland,Google News: startup pozyskał finansowanie,Polish,2,google news,https://news.google.com/rss/search?q=startup%20pozyska%C5%82%20finansowanie%20when%3A7d&hl=pl&gl=PL&ceid=PL:pl
+Europe,Czech Republic,Google News: startup získal investici,Czech,2,google news,https://news.google.com/rss/search?q=startup%20z%C3%ADskal%20investici%20when%3A7d&hl=cs&gl=CZ&ceid=CZ:cs
+Europe,Romania,Google News: startup finanțare rundă,Romanian,2,google news,https://news.google.com/rss/search?q=startup%20finan%C8%9Bare%20rund%C4%83%20when%3A7d&hl=ro&gl=RO&ceid=RO:ro
+Europe,Hungary,Google News: startup befektetés millió,Hungarian,2,google news,https://news.google.com/rss/search?q=startup%20befektet%C3%A9s%20milli%C3%B3%20when%3A7d&hl=hu&gl=HU&ceid=HU:hu
+Europe,Greece,Google News: startup χρηματοδότηση,Greek,2,google news,https://news.google.com/rss/search?q=startup%20%CF%87%CF%81%CE%B7%CE%BC%CE%B1%CF%84%CE%BF%CE%B4%CF%8C%CF%84%CE%B7%CF%83%CE%B7%20when%3A7d&hl=el&gl=GR&ceid=GR:el
+Americas,United States,Google News: startup raises seed round,English,2,google news,https://news.google.com/rss/search?q=startup%20raises%20seed%20round%20when%3A7d&hl=en-US&gl=US&ceid=US:en
+Americas,United States,Google News: startup raises Series A,English,2,google news,https://news.google.com/rss/search?q=startup%20raises%20Series%20A%20when%3A7d&hl=en-US&gl=US&ceid=US:en
+Americas,United States,Google News: startup raises Series B,English,2,google news,https://news.google.com/rss/search?q=startup%20raises%20Series%20B%20when%3A7d&hl=en-US&gl=US&ceid=US:en
+Americas,Canada,Google News: startup raises funding,English,2,google news,https://news.google.com/rss/search?q=startup%20raises%20funding%20when%3A7d&hl=en-CA&gl=CA&ceid=CA:en
+Americas,Canada,Google News: start-up québécoise financement,French,2,google news,https://news.google.com/rss/search?q=start-up%20qu%C3%A9b%C3%A9coise%20financement%20when%3A7d&hl=fr-CA&gl=CA&ceid=CA:fr
+Americas,Brazil,Google News: startup rodada de investimento,Portuguese,2,google news,https://news.google.com/rss/search?q=startup%20rodada%20de%20investimento%20when%3A7d&hl=pt-BR&gl=BR&ceid=BR:pt-419
+Americas,Brazil,Google News: startup capta milhões,Portuguese,2,google news,https://news.google.com/rss/search?q=startup%20capta%20milh%C3%B5es%20when%3A7d&hl=pt-BR&gl=BR&ceid=BR:pt-419
+Americas,Mexico,Google News: startup ronda de inversión,Spanish,2,google news,https://news.google.com/rss/search?q=startup%20ronda%20de%20inversi%C3%B3n%20when%3A7d&hl=es-419&gl=MX&ceid=MX:es-419
+Americas,Argentina,Google News: startup ronda de inversión,Spanish,2,google news,https://news.google.com/rss/search?q=startup%20ronda%20de%20inversi%C3%B3n%20when%3A7d&hl=es-419&gl=AR&ceid=AR:es-419
+Americas,Chile,Google News: startup ronda de inversión,Spanish,2,google news,https://news.google.com/rss/search?q=startup%20ronda%20de%20inversi%C3%B3n%20when%3A7d&hl=es-419&gl=CL&ceid=CL:es-419
+Americas,Colombia,Google News: startup ronda de inversión,Spanish,2,google news,https://news.google.com/rss/search?q=startup%20ronda%20de%20inversi%C3%B3n%20when%3A7d&hl=es-419&gl=CO&ceid=CO:es-419
+Americas,Peru,Google News: startup ronda de inversión,Spanish,2,google news,https://news.google.com/rss/search?q=startup%20ronda%20de%20inversi%C3%B3n%20when%3A7d&hl=es-419&gl=PE&ceid=PE:es-419
+Africa,Nigeria,Google News: startup raises funding,English,2,google news,https://news.google.com/rss/search?q=startup%20raises%20funding%20when%3A7d&hl=en-NG&gl=NG&ceid=NG:en
+Africa,Kenya,Google News: startup raises funding,English,2,google news,https://news.google.com/rss/search?q=startup%20raises%20funding%20when%3A7d&hl=en-KE&gl=KE&ceid=KE:en
+Africa,South Africa,Google News: startup raises funding,English,2,google news,https://news.google.com/rss/search?q=startup%20raises%20funding%20when%3A7d&hl=en-ZA&gl=ZA&ceid=ZA:en
+Africa,Ghana,Google News: startup raises funding,English,2,google news,https://news.google.com/rss/search?q=startup%20raises%20funding%20when%3A7d&hl=en-GH&gl=GH&ceid=GH:en
+Africa,Egypt,Google News: startup raises funding,English,2,google news,https://news.google.com/rss/search?q=startup%20raises%20funding%20when%3A7d&hl=en-EG&gl=EG&ceid=EG:en
+Africa,Egypt,Google News: شركة ناشئة جولة تمويل,Arabic,2,google news,https://news.google.com/rss/search?q=%D8%B4%D8%B1%D9%83%D8%A9%20%D9%86%D8%A7%D8%B4%D8%A6%D8%A9%20%D8%AC%D9%88%D9%84%D8%A9%20%D8%AA%D9%85%D9%88%D9%8A%D9%84%20when%3A7d&hl=ar&gl=EG&ceid=EG:ar
+Africa,Morocco,Google News: startup lève fonds,French,2,google news,https://news.google.com/rss/search?q=startup%20l%C3%A8ve%20fonds%20when%3A7d&hl=fr&gl=MA&ceid=MA:fr
+Africa,Senegal,Google News: startup lève fonds,French,2,google news,https://news.google.com/rss/search?q=startup%20l%C3%A8ve%20fonds%20when%3A7d&hl=fr&gl=SN&ceid=SN:fr
+Middle East,Saudi Arabia,Google News: شركة ناشئة جولة تمويل,Arabic,2,google news,https://news.google.com/rss/search?q=%D8%B4%D8%B1%D9%83%D8%A9%20%D9%86%D8%A7%D8%B4%D8%A6%D8%A9%20%D8%AC%D9%88%D9%84%D8%A9%20%D8%AA%D9%85%D9%88%D9%8A%D9%84%20when%3A7d&hl=ar&gl=SA&ceid=SA:ar
+Middle East,United Arab Emirates,Google News: startup raises funding,English,2,google news,https://news.google.com/rss/search?q=startup%20raises%20funding%20when%3A7d&hl=en-AE&gl=AE&ceid=AE:en
+Middle East,Israel,Google News: startup raises funding,English,2,google news,https://news.google.com/rss/search?q=startup%20raises%20funding%20when%3A7d&hl=en-IL&gl=IL&ceid=IL:en
+Middle East,Israel,Google News: סטארטאפ גייס מיליון,Hebrew,2,google news,https://news.google.com/rss/search?q=%D7%A1%D7%98%D7%90%D7%A8%D7%98%D7%90%D7%A4%20%D7%92%D7%99%D7%99%D7%A1%20%D7%9E%D7%99%D7%9C%D7%99%D7%95%D7%9F%20when%3A7d&hl=he&gl=IL&ceid=IL:he
+Middle East,Turkey,Google News: girişim yatırım aldı,Turkish,2,google news,https://news.google.com/rss/search?q=giri%C5%9Fim%20yat%C4%B1r%C4%B1m%20ald%C4%B1%20when%3A7d&hl=tr&gl=TR&ceid=TR:tr
