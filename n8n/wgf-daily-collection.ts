@@ -1,6 +1,6 @@
 import { workflow, node, trigger, expr } from '@n8n/workflow-sdk';
 
-// What Got Funded — weekly collection.
+// What Got Funded — daily collection (5:00 Sydney). Collects the last 48 hours; duplicates are skipped.
 // The x-wgf-token value lives only in n8n; this export uses a placeholder.
 const FN = 'https://cxtcwslqzrzjaulqcvvu.supabase.co/functions/v1/wgf-collect';
 const TOKEN = '__WGF_TOKEN__';
@@ -12,7 +12,7 @@ const lenient = { response: { response: { neverError: true, responseFormat: 'jso
 const schedule = trigger({
   type: 'n8n-nodes-base.scheduleTrigger',
   version: 1.3,
-  config: { name: 'Saturday 12:15 Sydney', parameters: { rule: { interval: [{ field: 'cronExpression', expression: '0 15 12 * * 6' }] } } },
+  config: { name: 'Daily 5:00 Sydney', parameters: { rule: { interval: [{ field: 'cronExpression', expression: '0 0 5 * * *' }] } } },
 });
 
 const runNow = trigger({ type: 'n8n-nodes-base.manualTrigger', version: 1, config: { name: 'Run now' } });
@@ -85,21 +85,21 @@ const byChannel = {}, byRegion = {};
 let newItems = 0, week = null; const failed = [];
 for (const b of batches) {
   if (b.error || !b.by_channel) { failed.push(b.error || b.message || 'no response'); continue; }
-  week = week || b.week; newItems += b.new_raw_items || 0;
+  week = week || b.day; newItems += b.new_raw_items || 0;
   add(byChannel, b.by_channel); add(byRegion, b.by_region);
 }
 add(byChannel, p.by_channel);
 const errs = [...batches.flatMap(b => b.errors || []), ...(p.errors || [])];
 const row = (k, g) => '<tr><td>' + k + '</td><td>' + g.sources + '</td><td>' + g.ok + '</td><td>' + g.empty + '</td><td>' + g.error + '</td><td>' + g.items + '</td></tr>';
 const table = (o) => '<table border="1" cellpadding="4" style="border-collapse:collapse"><tr><th></th><th>Sources</th><th>OK</th><th>Empty</th><th>Error</th><th>Items</th></tr>' + Object.entries(o).map(([k, g]) => row(k, g)).join('') + '</table>';
-const html = '<h2>What Got Funded: collection for week of ' + (week || '?') + '</h2>'
+const html = '<h2>What Got Funded: collection for ' + (week || '?') + '</h2>'
   + '<p>Registry sync: ' + (s.synced_sources ?? ('failed: ' + (s.error || '?'))) + ' sources. '
   + newItems + ' new items from feeds, ' + (p.new_raw_items ?? 0) + ' page snapshots.</p>'
   + (failed.length ? '<p><b>' + failed.length + ' of ' + batches.length + ' feed batches failed:</b> ' + failed.join('; ') + '</p>' : '')
   + '<h3>By channel</h3>' + table(byChannel)
   + '<h3>By region (feeds)</h3>' + table(byRegion)
   + '<h3>Source failures</h3><ul>' + (errs.map(e => '<li>' + e.source + ' (' + e.channel + '): ' + e.error + '</li>').join('') || '<li>None</li>') + '</ul>';
-return [{ json: { subject: 'WGF collection ' + (week || '') + ': ' + newItems + ' items, ' + (errs.length + failed.length) + ' failures', html } }];`,
+return [{ json: { subject: 'WGF daily collection ' + (week || '') + ': ' + newItems + ' items, ' + (errs.length + failed.length) + ' failures', html } }];`,
     },
   },
 });
@@ -119,7 +119,7 @@ const email = node({
   },
 });
 
-export default workflow('tpNTZVkWoiWgSI9n', 'WGF — Weekly Collection')
+export default workflow('tpNTZVkWoiWgSI9n', 'WGF — Daily Collection')
   .add(schedule)
   .to(sync)
   .to(makeBatches)
