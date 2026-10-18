@@ -90,6 +90,118 @@ Reply with JSON only, no prose:
   return { system, user: `Items (one JSON object per line):\n${lines.join("\n")}` };
 }
 
+// ---------- full-article prompt (Apify crawler, one article per call) ----------
+function buildArticlePrompt(item: Record<string, unknown>) {
+  const meta = (item.meta ?? {}) as Record<string, unknown>;
+  const system = `You read one full news article, in any language, and extract the startup funding rounds it reports as JSON, in English. You are precise and never guess.
+
+Include only equity or venture rounds raised by startups or private growth companies: pre-seed, seed, angel, Series A onwards, growth equity, and strategic or corporate investments in startups.
+If the article reports no such round, return it in excluded with one reason: not_funding, debt, grant, fund_close, ipo_or_public, m_and_a, secondary, private_equity, duplicate_listing, rumour (talks, "in discussions", "plans to raise", "reportedly" without a confirmed close), other.
+
+Rules:
+- Use only what the article states, plus the links listed under "Links in the article". Never invent a domain, social profile, founder, investor, amount or date. Unstated values are null or [].
+- One round per company. A roundup article may report several rounds; extract each.
+- Translate everything into English. company is the English or romanised name; company_native is the original-script name if different, else null.
+- domain: the company's own website, only if the article names it or a link in the article clearly points to it (match by name). Not the publisher, an investor or a social network.
+- company_socials and founders' linkedin/x: only URLs from "Links in the article" that clearly belong to that company or person; else null.
+- amount: a number in full units of the stated currency (16.25亿元 → 1625000000 CNY; 30億円 → 3000000000 JPY; 50억원 → 5000000000 KRW; Rs 36.5 crore → 365000000 INR). For bounds ("more than $500M") set the figure and copy the wording to amount_text. For vague sizes (数千万元, "eight figures") amount is null and the wording goes to amount_text.
+- amount_usd_stated: the USD figure only if the article itself gives one.
+- lead_investors and investors: named firms or people only, in English. Never placeholders such as "existing investors".
+- stage: one of ${STAGES.join(", ")}. Angel counts as seed; Pre-A and A+ as series_a; B+ as series_b; undisclosed if not stated.
+- sector: one of ${SECTORS.map((s) => `"${s}"`).join(", ")}.
+- hq_city, hq_country: the company's base, in English, if stated or clear (e.g. "Bengaluru-based").
+- description: one plain sentence on what the company does. unique: one sentence on what is distinctive about the company or this round, only if the article supports it, else null. summary: two or three sentences for a newsletter entry covering what the company does, the round and what the money is for, using only facts in the article.
+- use_of_funds: what the money is for, if stated, else null.
+- announced_on: YYYY-MM-DD of the announcement if the article dates it, else the article's publish date.
+
+Reply with JSON only:
+{"rounds":[{"item_ids":[${Number(item.id)}],"company":"","company_native":null,"domain":null,"company_socials":{"linkedin":null,"x":null},"hq_city":null,"hq_country":null,"sector":"","stage":"","amount":null,"currency":null,"amount_usd_stated":null,"amount_text":null,"lead_investors":[],"investors":[],"founders":[{"name":"","role":"","linkedin":null,"x":null}],"description":"","unique":null,"use_of_funds":null,"summary":"","announced_on":null}],"excluded":[{"id":${Number(item.id)},"reason":"not_funding"}]}`;
+  const links = [
+    ...((meta.outbound as { domain: string; anchor: string }[]) ?? []).map((o) => `${o.domain} — "${o.anchor}"`),
+    ...((meta.socials as string[]) ?? []),
+  ];
+  const user = [
+    `Article id: ${Number(item.id)}`,
+    `Source: ${item.source ?? meta.source ?? ""} (${item.market ?? meta.market ?? ""}), language: ${meta.page_language ?? meta.source_language ?? "unknown"}`,
+    `Published: ${item.published_at ? new Date(item.published_at as string).toISOString().slice(0, 10) : "unknown"}`,
+    `Headline: ${item.title ?? ""}`,
+    `URL: ${item.url}`,
+    "",
+    String(item.content ?? "").slice(0, 9000),
+    "",
+    "Links in the article:",
+    links.length ? links.join("\n") : "(none)",
+  ].join("\n");
+  return { system, user };
+}
+
+// ---------- ingest crawler output ----------
+async function ingest(body: Record<string, unknown>) {
+  const items = (Array.isArray(body.items) ? body.items : []) as Record<string, unknown>[];
+  let inserted = 0;
+  for (const a of items) {
+    const url = str(a.url, 2000);
+    if (!url || !a.text) continue;
+    const day = /^\d{4}-\d{2}-\d{2}$/.test(String(a.published_on)) ? String(a.published_on) : String(a.target_date ?? "").slice(0, 10) || new Date().toISOString().slice(0, 10);
+    const raw = Date.parse(String(a.published_raw ?? ""));
+    const publishedAt = Number.isFinite(raw) && new Date(raw).toISOString().slice(0, 10) === day ? new Date(raw).toISOString() : `${day}T00:00:00Z`;
+    const [src] = await sql`select id from wgf.sources where lower(source) = lower(${String(a.source ?? "")}) order by (market = ${String(a.market ?? "")}) desc limit 1`;
+    const meta = {
+      source: a.source, market: a.market, region: a.region, source_language: a.source_language, page_language: a.page_language,
+      found_via: a.found_via, google_url: a.google_url, date_basis: a.date_basis, date_unknown: a.date_unknown, target_date: a.target_date,
+      outbound: Array.isArray(a.outbound_links) ? a.outbound_links.slice(0, 25) : [], socials: Array.isArray(a.social_links) ? a.social_links.slice(0, 30) : [],
+    };
+    const r = await sql`insert into wgf.raw_items (source_id, channel, url, title, content, published_at, day, week, meta)
+                        values (${src?.id ?? null}, 'article', ${url}, ${str(a.headline, 500)}, ${String(a.text).slice(0, 12000)}, ${publishedAt},
+                                ${day}::date, wgf.week_of(${publishedAt}::timestamptz), ${sql.json(meta)})
+                        on conflict (url) do nothing returning id`;
+    inserted += r.length;
+  }
+  return { received: items.length, inserted };
+}
+
+// ---------- company sites (crawler companies mode) ----------
+async function companyTargets(body: Record<string, unknown>) {
+  const days = Math.min(Number(body.days) || 3, 30);
+  const rows = await sql`select distinct c.domain from wgf.companies c join wgf.rounds r on r.company_id = c.id
+                         where c.domain is not null and c.site_checked_at is null and r.status = 'live'
+                           and r.created_at > now() - make_interval(days => ${days})`;
+  return { domains: rows.map((r) => r.domain) };
+}
+
+async function companySave(body: Record<string, unknown>) {
+  const items = (Array.isArray(body.items) ? body.items : []) as Record<string, unknown>[];
+  let updated = 0, people = 0;
+  for (const s of items) {
+    const domain = cleanDomain(s.domain);
+    if (!domain) continue;
+    const so = (s.company_socials ?? {}) as Record<string, string>;
+    const [co] = await sql`update wgf.companies set
+        linkedin_url = coalesce(linkedin_url, ${str(so.linkedin)}), x_url = coalesce(x_url, ${str(so.x)}),
+        instagram_url = coalesce(instagram_url, ${str(so.instagram)}), youtube_url = coalesce(youtube_url, ${str(so.youtube)}),
+        github_url = coalesce(github_url, ${str(so.github)}), facebook_url = coalesce(facebook_url, ${str(so.facebook)}),
+        careers_url = coalesce(careers_url, ${str(s.careers_url)}),
+        description = coalesce(description, ${str(s.site_description, 400)}),
+        site_checked_at = now(), updated_at = now()
+      where domain = ${domain} returning id`;
+    if (!co) continue;
+    updated++;
+    // A LinkedIn profile on the company's own site is attached to a founder only when the link label contains their name
+    const founders = await sql`select p.id, p.name from wgf.people p join wgf.company_people cp on cp.person_id = p.id
+                               where cp.company_id = ${co.id} and p.linkedin_url is null`;
+    for (const l of (Array.isArray(s.people_links) ? s.people_links : []) as { linkedin: string; label: string }[]) {
+      const label = String(l.label ?? "").toLowerCase();
+      const slug = String(l.linkedin ?? "").toLowerCase();
+      const f = founders.find((p) => {
+        const parts = String(p.name).toLowerCase().split(/\s+/).filter((x) => x.length > 1);
+        return parts.length > 1 && parts.every((x) => label.includes(x) || slug.includes(x));
+      });
+      if (f) { await sql`update wgf.people set linkedin_url = ${l.linkedin}, verified_by = 'company_site' where id = ${f.id} and linkedin_url is null`; people++; }
+    }
+  }
+  return { received: items.length, companies_updated: updated, founder_links: people };
+}
+
 // ---------- reply parsing ----------
 function parseReply(text: string): { rounds: Record<string, unknown>[]; excluded: { id: number; reason: string }[] } {
   const start = text.indexOf("{"), end = text.lastIndexOf("}");
@@ -113,7 +225,7 @@ const cleanDomain = (v: unknown) => {
 async function save(ids: number[], text: string) {
   const { rounds, excluded } = parseReply(text);
   const fx = await usdRates();
-  const items = await sql`select id, url, title, published_at from wgf.raw_items where id = any(${ids})`;
+  const items = await sql`select id, url, title, published_at, channel from wgf.raw_items where id = any(${ids})`;
   const byId = new Map(items.map((i) => [Number(i.id), i]));
   const touched = new Set<number>();
   let created = 0, merged = 0;
@@ -144,7 +256,12 @@ async function save(ids: number[], text: string) {
                          and (hq_country is null or ${country}::text is null or hq_country = ${country})
                        order by updated_at desc limit 1`;
     }
+    const cs = (r.company_socials ?? {}) as Record<string, unknown>;
+    const socialUrl = (v: unknown, host: RegExp) => { const u = str(v, 300); return u && host.test(u) ? u.split("?")[0] : null; };
+    const coLinkedin = socialUrl(cs.linkedin, /^https?:\/\/([a-z]+\.)?linkedin\.com\/company\//i);
+    const coX = socialUrl(cs.x, /^https?:\/\/(www\.)?(x|twitter)\.com\/[A-Za-z0-9_]{1,15}\/?$/i);
     if (co) {
+      await sql`update wgf.companies set linkedin_url = coalesce(linkedin_url, ${coLinkedin}), x_url = coalesce(x_url, ${coX}) where id = ${co.id}`;
       await sql`update wgf.companies set
                   domain = coalesce(domain, ${domain}), name_native = coalesce(name_native, ${native}),
                   hq_city = coalesce(hq_city, ${str(r.hq_city, 100)}), hq_country = coalesce(hq_country, ${country}),
@@ -152,9 +269,9 @@ async function save(ids: number[], text: string) {
                   updated_at = now()
                 where id = ${co.id}`;
     } else {
-      [co] = await sql`insert into wgf.companies (name, name_en, name_native, name_key, domain, description, hq_city, hq_country, sector)
+      [co] = await sql`insert into wgf.companies (name, name_en, name_native, name_key, domain, description, hq_city, hq_country, sector, linkedin_url, x_url)
                        values (${company}, ${company}, ${native}, wgf.name_key(${company}), ${domain}, ${str(r.description)},
-                               ${str(r.hq_city, 100)}, ${country}, ${sector})
+                               ${str(r.hq_city, 100)}, ${country}, ${sector}, ${coLinkedin}, ${coX})
                        returning id`;
     }
 
@@ -170,15 +287,15 @@ async function save(ids: number[], text: string) {
                   stage = case when stage = 'undisclosed' then ${stage} else stage end,
                   amount = coalesce(amount, ${amount}), currency = coalesce(currency, ${currency}),
                   amount_usd = coalesce(amount_usd, ${amountUsd}), amount_text = coalesce(amount_text, ${str(r.amount_text, 120)}),
-                  highlight = coalesce(highlight, ${str(r.highlight)}),
+                  highlight = coalesce(highlight, ${str(r.highlight ?? r.unique)}), summary = coalesce(summary, ${str(r.summary, 1200)}),
                   announced_on = least(announced_on, ${announced}::date), updated_at = now()
                 where id = ${rd.id}`;
     } else {
       created++;
       [rd] = await sql`insert into wgf.rounds (company_id, stage, amount, currency, amount_usd, amount_text, announced_on, week,
-                                               confidence, highlight, headline, edition, status)
+                                               confidence, highlight, summary, headline, edition, status)
                        values (${co.id}, ${stage}, ${amount}, ${currency}, ${amountUsd}, ${str(r.amount_text, 120)}, ${announced},
-                               wgf.week_of(${announced}::date), 'reported', ${str(r.highlight)}, ${byId.get(itemIds[0])!.title},
+                               wgf.week_of(${announced}::date), 'reported', ${str(r.highlight ?? r.unique)}, ${str(r.summary, 1200)}, ${byId.get(itemIds[0])!.title},
                                least(wgf.next_edition(now()), (${firstPub}::timestamptz at time zone 'Australia/Sydney')::date + 1), ${status})
                        returning id`;
     }
@@ -204,6 +321,16 @@ async function save(ids: number[], text: string) {
       if (!p) [p] = await sql`insert into wgf.people (name, name_key) values (${name}, wgf.name_key(${name})) returning id`;
       await sql`insert into wgf.company_people (company_id, person_id, role) values (${co.id}, ${p.id}, ${str(f?.role, 60) ?? "founder"})
                 on conflict do nothing`;
+      const li = socialUrl(f?.linkedin, /^https?:\/\/([a-z]+\.)?linkedin\.com\/in\//i), x = socialUrl(f?.x, /^https?:\/\/(www\.)?(x|twitter)\.com\/[A-Za-z0-9_]{1,15}\/?$/i);
+      if (li || x) await sql`update wgf.people set linkedin_url = coalesce(linkedin_url, ${li}), x_url = coalesce(x_url, ${x}),
+                                verified_by = coalesce(verified_by, 'article') where id = ${p.id}`;
+    }
+
+    // full profile for audit (article extraction only)
+    if (itemIds.some((i) => byId.get(i)!.channel === "article")) {
+      await sql`insert into wgf.round_profiles (round_id, profile, verdict, method)
+                values (${rd.id}, ${sql.json({ ...r, source_urls: itemIds.map((i) => byId.get(i)!.url) })}, ${status === "live" ? "valid_recent" : status}, 'pipeline')
+                on conflict (round_id) do update set profile = wgf.round_profiles.profile || jsonb_build_object('also', excluded.profile)`;
     }
 
     // sources
@@ -234,7 +361,12 @@ async function save(ids: number[], text: string) {
 
 // ---------- plan ----------
 async function plan(body: Record<string, unknown>) {
-  const pending = await sql`select id, title, content from wgf.raw_items where status = 'pending' order by published_at nulls last, id`;
+  // channel "article": full crawler articles, one per chunk. Otherwise headline items from the older collector.
+  const articles = body.channel === "article";
+  if (articles) body.size = 1;
+  const pending = articles
+    ? await sql`select id, title, content from wgf.raw_items where status = 'pending' and channel = 'article' order by published_at nulls last, id`
+    : await sql`select id, title, content from wgf.raw_items where status = 'pending' and channel <> 'article' order by published_at nulls last, id`;
   const drop: number[] = [], keep: number[] = [];
   for (const p of pending) (FUNDING_RE.test(`${p.title ?? ""} ${String(p.content ?? "").slice(0, 600)}`) ? keep : drop).push(Number(p.id));
   for (let k = 0; k < drop.length; k += 1000) {
@@ -248,9 +380,10 @@ async function plan(body: Record<string, unknown>) {
 }
 
 async function prompt(ids: number[]) {
-  const items = await sql`select r.id, r.title, r.content, r.published_at, s.source, s.market
+  const items = await sql`select r.id, r.url, r.title, r.content, r.published_at, r.channel, r.meta, s.source, s.market
                           from wgf.raw_items r left join wgf.sources s on s.id = r.source_id
                           where r.id = any(${ids}) and r.status = 'pending' order by r.id`;
+  if (items.length === 1 && items[0].channel === "article") return { ids: [Number(items[0].id)], ...buildArticlePrompt(items[0]) };
   return { ids: items.map((i) => Number(i.id)), ...buildPrompt(items) };
 }
 
@@ -264,7 +397,10 @@ Deno.serve(async (req) => {
     if (body.mode === "plan") return json(await plan(body));
     if (body.mode === "prompt") return json(await prompt(ids));
     if (body.mode === "save") return json(await save(ids, String(body.text ?? "")));
-    return json({ error: "mode must be plan, prompt or save" }, 400);
+    if (body.mode === "ingest") return json(await ingest(body));
+    if (body.mode === "company_targets") return json(await companyTargets(body));
+    if (body.mode === "company_save") return json(await companySave(body));
+    return json({ error: "mode must be plan, prompt, save, ingest, company_targets or company_save" }, 400);
   } catch (e) {
     return json({ error: String((e as Error).message ?? e) }, 500);
   }
