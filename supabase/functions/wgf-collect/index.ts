@@ -11,6 +11,7 @@
 //   so no single call exceeds the edge runtime CPU limit.
 //
 // POST /functions/v1/wgf-collect   { "mode": "sources", "channels": ["google_news"] }  → active feeds to fetch elsewhere.
+//   Apify calls also accept { "retry_failed": true, "apify_timeout": 120 } to re-run today's timed-out pages.
 //   Collection also accepts { "prefetched": [{ "source_id", "status", "body", "error" }] }: feeds fetched by n8n
 //   (Google News blocks some Supabase egress IPs), parsed and stored here.
 //
@@ -258,12 +259,12 @@ function headlineLinks(md: string, pageUrl: string, filter: boolean): Item[] {
   return out;
 }
 
-async function scrapePage(s: Source, token: string): Promise<Item[]> {
+async function scrapePage(s: Source, token: string, timeoutSecs = 90): Promise<Item[]> {
   if (!(await robotsAllows(s.url!))) throw new Error("robots.txt disallows this page");
   const input: Record<string, unknown> = { url: s.url, formats: ["markdown"] };
   if (s.settings?.wait) input.wait = s.settings.wait;
   const r = await fetch(
-    `https://api.apify.com/v2/acts/apify~web-fetch/run-sync-get-dataset-items?timeout=90`,
+    `https://api.apify.com/v2/acts/apify~web-fetch/run-sync-get-dataset-items?timeout=${timeoutSecs}`,
     { method: "POST", headers: { "content-type": "application/json", authorization: `Bearer ${token}` }, body: JSON.stringify(input) },
   );
   if (!r.ok) throw new Error(`Apify HTTP ${r.status}: ${(await r.text()).slice(0, 200)}`);
@@ -293,6 +294,13 @@ async function collect(body: Record<string, unknown>) {
   const pre = new Map((Array.isArray(body.prefetched) ? body.prefetched as Record<string, unknown>[] : [])
     .map((p) => [Number(p.source_id), p]));
   if (pre.size) sources = sources.filter((s) => pre.has(Number(s.id)));
+  // Retry pass: only pages that timed out or came back empty earlier today.
+  if (body.retry_failed) {
+    const failed = await sql`select source_id from wgf.source_health
+                             where day = ${day} and status = 'error' and (errors like '%TIMED-OUT%' or errors like 'empty or blocked%')`;
+    const ids = new Set(failed.map((f) => Number(f.source_id)));
+    sources = sources.filter((s) => ids.has(Number(s.id)));
+  }
   // Batching keeps each call under the edge runtime's CPU limit: { "batch": 0, "batches": 8 }.
   const batches = Number(body.batches) || 1;
   if (batches > 1) sources = sources.filter((s) => Number(s.id) % batches === Number(body.batch ?? 0));
@@ -303,7 +311,7 @@ async function collect(body: Record<string, unknown>) {
       let items: Item[];
       if (s.channel === "apify") {
         if (!apifyToken) throw new Error("APIFY_TOKEN secret not set");
-        items = (await scrapePage(s, apifyToken)).map((i) => ({ ...i, published_at: now.toISOString() }));
+        items = (await scrapePage(s, apifyToken, Number(body.apify_timeout) || 90)).map((i) => ({ ...i, published_at: now.toISOString() }));
       } else if (pre.size) {
         const p = pre.get(Number(s.id))!;
         if (p.error || Number(p.status) >= 400) throw new Error(String(p.error ?? `HTTP ${p.status}`));

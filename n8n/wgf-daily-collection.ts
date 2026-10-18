@@ -150,6 +150,34 @@ const scrape = node({
   },
 });
 
+// Second pass for pages that timed out: longer Apify timeout, ~6 pages per call.
+const RETRY_BATCHES = 7;
+const makeRetryBatches = node({
+  type: 'n8n-nodes-base.code',
+  version: 2,
+  config: {
+    name: 'Make retry batches',
+    parameters: {
+      mode: 'runOnceForAllItems',
+      jsCode: `return Array.from({ length: ${RETRY_BATCHES} }, (_, i) => ({ json: { batch: i, batches: ${RETRY_BATCHES} } }));`,
+    },
+  },
+});
+
+const retry = node({
+  type: 'n8n-nodes-base.httpRequest',
+  version: 4.4,
+  config: {
+    name: 'Retry slow pages',
+    parameters: {
+      method: 'POST', url: FN, sendHeaders: true, headerParameters: headers,
+      sendBody: true, contentType: 'json', specifyBody: 'json',
+      jsonBody: expr('{{ JSON.stringify({ channels: ["apify"], skip_sync: true, retry_failed: true, apify_timeout: 120, batch: $json.batch, batches: $json.batches, concurrency: 8 }) }}'),
+      options: { timeout: 300000, batching: { batch: { batchSize: 1, batchInterval: 40000 } }, ...lenient },
+    },
+  },
+});
+
 const report = node({
   type: 'n8n-nodes-base.code',
   version: 2,
@@ -157,7 +185,9 @@ const report = node({
     name: 'Build run report',
     parameters: {
       mode: 'runOnceForAllItems',
-      jsCode: `const batches = [...$('Store Google News items').all(), ...$('Collect RSS feeds').all(), ...$('Scrape pages (Apify web-fetch)').all()].map(i => i.json);
+      jsCode: `const retried = $('Retry slow pages').all().map(i => i.json);
+const slow = e => /TIMED-OUT|^empty or blocked/.test(e.error || '');
+const batches = [...$('Store Google News items').all(), ...$('Collect RSS feeds').all(), ...$('Scrape pages (Apify web-fetch)').all()].map(i => i.json);
 const s = $('Sync source registry from GitHub').first().json;
 const add = (into, from) => { for (const [k, g] of Object.entries(from || {})) { const t = (into[k] ??= { sources: 0, ok: 0, empty: 0, error: 0, items: 0 }); for (const f of Object.keys(t)) t[f] += g[f] || 0; } return into; };
 const byChannel = {}, byRegion = {};
@@ -167,12 +197,15 @@ for (const b of batches) {
   week = week || b.day; newItems += b.new_raw_items || 0;
   add(byChannel, b.by_channel); add(byRegion, b.by_region);
 }
-const errs = batches.flatMap(b => b.errors || []);
+const retryPolled = retried.reduce((a, b) => a + (b.sources_polled || 0), 0);
+const retryErrs = retried.flatMap(b => b.errors || []);
+newItems += retried.reduce((a, b) => a + (b.new_raw_items || 0), 0);
+const errs = [...batches.flatMap(b => b.errors || []).filter(e => !slow(e)), ...retryErrs];
 const row = (k, g) => '<tr><td>' + k + '</td><td>' + g.sources + '</td><td>' + g.ok + '</td><td>' + g.empty + '</td><td>' + g.error + '</td><td>' + g.items + '</td></tr>';
 const table = (o) => '<table border="1" cellpadding="4" style="border-collapse:collapse"><tr><th></th><th>Sources</th><th>OK</th><th>Empty</th><th>Error</th><th>Items</th></tr>' + Object.entries(o).map(([k, g]) => row(k, g)).join('') + '</table>';
 const html = '<h2>What Got Funded: collection for ' + (week || '?') + '</h2>'
   + '<p>Registry sync: ' + (s.synced_sources ?? ('failed: ' + (s.error || '?'))) + ' sources. '
-  + newItems + ' new items from feeds and scraped pages.</p>'
+  + newItems + ' new items from feeds and scraped pages. Retry pass: ' + (retryPolled - retryErrs.length) + ' of ' + retryPolled + ' slow pages recovered.</p>'
   + (failed.length ? '<p><b>' + failed.length + ' of ' + batches.length + ' batches failed:</b> ' + failed.join('; ') + '</p>' : '')
   + '<h3>By channel</h3>' + table(byChannel)
   + '<h3>By region</h3>' + table(byRegion)
@@ -209,6 +242,8 @@ export default workflow('tpNTZVkWoiWgSI9n', 'WGF — Daily Collection')
   .to(collect)
   .to(makeApifyBatches)
   .to(scrape)
+  .to(makeRetryBatches)
+  .to(retry)
   .to(report)
   .to(email)
   .add(runNow)
