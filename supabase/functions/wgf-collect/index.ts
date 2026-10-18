@@ -124,6 +124,7 @@ async function syncSources() {
     const settings: Record<string, unknown> = {};
     const m = /wait=(\d+)/.exec(p.settings || "");
     if (m) settings.wait = Number(m[1]);
+    if (p.filter === "funding") settings.filter = "funding";
     rows.push({
       region: regionBySource.get(p.source) ?? regionByMarket.get(p.market) ?? "Global",
       market: p.market, source: p.source, language: null, channel: "apify", priority: null,
@@ -191,19 +192,87 @@ function parseFeed(body: string): Item[] {
 }
 
 // ---------- Apify ----------
+// A scraped page is a listing (funding section or homepage). We keep the article links on it:
+// each headline becomes one item, and URLs seen on earlier days are skipped by the unique index,
+// so every run stores only the stories that are new since the last run.
+
+const robotsCache = new Map<string, string[]>();
+async function robotsAllows(pageUrl: string): Promise<boolean> {
+  const u = new URL(pageUrl);
+  if (!robotsCache.has(u.origin)) {
+    let rules: string[] = [];
+    try {
+      const txt = await fetchOnce(`${u.origin}/robots.txt`, 8000);
+      let applies = false;
+      for (const raw of txt.split(/\r?\n/)) {
+        const line = raw.replace(/#.*/, "").trim();
+        const [k, ...rest] = line.split(":"); const v = rest.join(":").trim();
+        if (/^user-agent$/i.test(k)) applies = v === "*";
+        else if (applies && /^disallow$/i.test(k) && v) rules.push(v);
+        else if (applies && /^allow$/i.test(k) && v) rules.push("!" + v);
+      }
+    } catch { rules = []; } // no robots.txt or unreachable: allowed
+    robotsCache.set(u.origin, rules);
+  }
+  const path = u.pathname + u.search;
+  let best = "", allowed = true;
+  for (const r of robotsCache.get(u.origin)!) {
+    const allow = r.startsWith("!"), rule = allow ? r.slice(1) : r;
+    const re = new RegExp("^" + rule.replace(/[.+?^${}()|[\]\\]/g, "\\$&").replace(/\*/g, ".*").replace(/\\\$$/, "$"));
+    if (re.test(path) && rule.length >= best.length) { best = rule; allowed = allow; }
+  }
+  return allowed;
+}
+
+const siteOf = (host: string) => {
+  const parts = host.replace(/^www\./, "").split(".");
+  return parts.slice(/^(co|com|net|org|ac|gov)$/.test(parts.at(-2) ?? "") ? -3 : -2).join(".");
+};
+const SKIP_PATH = /\/(tag|tags|category|categories|author|authors|topic|topics|page|search|login|signin|signup|subscribe|account|about|contact|privacy|terms|advertis)\b/i;
+
+// An article link has a long slug or a numeric id in its last path segment; menus and sections don't.
+const looksLikeArticle = (u: URL) => {
+  const seg = decodeURIComponent(u.pathname.replace(/\/+$/, "").split("/").pop() ?? "");
+  return seg.length >= 20 || /\d{4,}/.test(seg) || (seg.match(/-/g) ?? []).length >= 3;
+};
+
+function headlineLinks(md: string, pageUrl: string, filter: boolean): Item[] {
+  const base = new URL(pageUrl), site = siteOf(base.hostname);
+  const seen = new Set<string>(), out: Item[] = [];
+  const flat = md.replace(/!\[([^\]]*)\]\([^)]*\)/g, " "); // drop images (titles often sit inside image links)
+  for (const m of flat.matchAll(/\[([^\[\]]{8,1200})\]\(([^)\s]+)(?:\s+"[^"]*")?\)/g)) {
+    const text = m[1].replace(/[*_`#>]/g, "").replace(/\s+/g, " ").trim();
+    let url: URL;
+    try { url = new URL(m[2], base); } catch { continue; }
+    if (!/^https?:$/.test(url.protocol) || siteOf(url.hostname) !== site) continue;
+    url.hash = ""; for (const k of [...url.searchParams.keys()]) if (/^utm_|^ref$|^fbclid$/.test(k)) url.searchParams.delete(k);
+    const href = url.toString();
+    if (href === base.toString() || SKIP_PATH.test(url.pathname) || !looksLikeArticle(url) || seen.has(href)) continue;
+    const cjk = /[぀-ヿ㐀-鿿가-힯]/.test(text);
+    if (cjk ? text.length < 8 : text.split(" ").length < 4 || text.length < 20) continue;
+    if (filter && !FUNDING_RE.test(text)) continue;
+    seen.add(href);
+    out.push({ url: href, title: text.slice(0, 300), content: text.length > 300 ? text.slice(0, 1200) : null, published_at: null });
+    if (out.length >= 80) break;
+  }
+  return out;
+}
 
 async function scrapePage(s: Source, token: string): Promise<Item[]> {
+  if (!(await robotsAllows(s.url!))) throw new Error("robots.txt disallows this page");
   const input: Record<string, unknown> = { url: s.url, formats: ["markdown"] };
   if (s.settings?.wait) input.wait = s.settings.wait;
   const r = await fetch(
-    `https://api.apify.com/v2/acts/apify~web-fetch/run-sync-get-dataset-items?timeout=120`,
+    `https://api.apify.com/v2/acts/apify~web-fetch/run-sync-get-dataset-items?timeout=90`,
     { method: "POST", headers: { "content-type": "application/json", authorization: `Bearer ${token}` }, body: JSON.stringify(input) },
   );
   if (!r.ok) throw new Error(`Apify HTTP ${r.status}: ${(await r.text()).slice(0, 200)}`);
   const rows = await r.json() as Record<string, unknown>[];
   const md = (rows?.[0]?.markdown as string) ?? "";
   if (md.trim().length < 200) throw new Error("empty or blocked page");
-  return [{ url: s.url!, title: `${s.source} — page snapshot`, content: md.slice(0, 400_000), published_at: null }];
+  const links = headlineLinks(md, s.url!, s.settings?.filter === "funding");
+  if (!links.length) throw new Error("no headline links found on page");
+  return links;
 }
 
 // ---------- main ----------
@@ -234,8 +303,7 @@ async function collect(body: Record<string, unknown>) {
       let items: Item[];
       if (s.channel === "apify") {
         if (!apifyToken) throw new Error("APIFY_TOKEN secret not set");
-        items = await scrapePage(s, apifyToken);
-        items = items.map((i) => ({ ...i, url: `${i.url}#wgf-day=${day}`, published_at: now.toISOString() }));
+        items = (await scrapePage(s, apifyToken)).map((i) => ({ ...i, published_at: now.toISOString() }));
       } else if (pre.size) {
         const p = pre.get(Number(s.id))!;
         if (p.error || Number(p.status) >= 400) throw new Error(String(p.error ?? `HTTP ${p.status}`));
