@@ -30,6 +30,72 @@ const sync = node({
   },
 });
 
+const listGoogle = node({
+  type: 'n8n-nodes-base.httpRequest',
+  version: 4.4,
+  config: {
+    name: 'List Google News feeds',
+    parameters: {
+      method: 'POST', url: FN, sendHeaders: true, headerParameters: headers,
+      sendBody: true, contentType: 'json', specifyBody: 'json', jsonBody: '{ "mode": "sources", "channels": ["google_news"] }',
+      options: { timeout: 60000, ...lenient },
+    },
+  },
+});
+
+const splitGoogle = node({
+  type: 'n8n-nodes-base.code',
+  version: 2,
+  config: {
+    name: 'One item per feed',
+    parameters: { mode: 'runOnceForAllItems', jsCode: `return ($input.first().json.feeds || []).map(f => ({ json: f }));` },
+  },
+});
+
+// Google News blocks some Supabase egress IPs, so n8n fetches these feeds itself.
+const fetchGoogle = node({
+  type: 'n8n-nodes-base.httpRequest',
+  version: 4.4,
+  config: {
+    name: 'Fetch Google News feed',
+    parameters: {
+      method: 'GET', url: expr('{{ $json.url }}'),
+      options: { timeout: 30000, batching: { batch: { batchSize: 1, batchInterval: 1500 } },
+        response: { response: { fullResponse: true, neverError: true, responseFormat: 'text' } } },
+    },
+  },
+});
+
+const chunkGoogle = node({
+  type: 'n8n-nodes-base.code',
+  version: 2,
+  config: {
+    name: 'Chunk fetched feeds',
+    parameters: {
+      mode: 'runOnceForAllItems',
+      jsCode: `const src = $('One item per feed').all();
+const rows = $input.all().map((r, i) => ({ source_id: src[i].json.id, status: r.json.statusCode, body: typeof r.json.body === 'string' ? r.json.body : (r.json.data || ''), error: r.json.error ? String(r.json.error.message || r.json.error) : undefined }));
+const out = [];
+for (let k = 0; k < rows.length; k += 8) out.push({ json: { prefetched: rows.slice(k, k + 8) } });
+return out;`,
+    },
+  },
+});
+
+const storeGoogle = node({
+  type: 'n8n-nodes-base.httpRequest',
+  version: 4.4,
+  config: {
+    name: 'Store Google News items',
+    parameters: {
+      method: 'POST', url: FN, sendHeaders: true, headerParameters: headers,
+      sendBody: true, contentType: 'json', specifyBody: 'json',
+      jsonBody: expr('{{ JSON.stringify({ channels: ["google_news"], skip_sync: true, prefetched: $json.prefetched }) }}'),
+      options: { timeout: 120000, batching: { batch: { batchSize: 1, batchInterval: 1000 } }, ...lenient },
+    },
+  },
+});
+
 const makeBatches = node({
   type: 'n8n-nodes-base.code',
   version: 2,
@@ -46,11 +112,11 @@ const collect = node({
   type: 'n8n-nodes-base.httpRequest',
   version: 4.4,
   config: {
-    name: 'Collect feeds (RSS + Google News)',
+    name: 'Collect RSS feeds',
     parameters: {
       method: 'POST', url: FN, sendHeaders: true, headerParameters: headers,
       sendBody: true, contentType: 'json', specifyBody: 'json',
-      jsonBody: expr('{{ JSON.stringify({ channels: ["rss", "google_news"], skip_sync: true, batch: $json.batch, batches: $json.batches }) }}'),
+      jsonBody: expr('{{ JSON.stringify({ channels: ["rss"], skip_sync: true, batch: $json.batch, batches: $json.batches }) }}'),
       options: { timeout: 300000, batching: { batch: { batchSize: 1, batchInterval: 15000 } }, ...lenient },
     },
   },
@@ -77,7 +143,7 @@ const report = node({
     name: 'Build run report',
     parameters: {
       mode: 'runOnceForAllItems',
-      jsCode: `const batches = $('Collect feeds (RSS + Google News)').all().map(i => i.json);
+      jsCode: `const batches = [...$('Store Google News items').all(), ...$('Collect RSS feeds').all()].map(i => i.json);
 const p = $('Scrape pages (Apify web-fetch)').first().json;
 const s = $('Sync source registry from GitHub').first().json;
 const add = (into, from) => { for (const [k, g] of Object.entries(from || {})) { const t = (into[k] ??= { sources: 0, ok: 0, empty: 0, error: 0, items: 0 }); for (const f of Object.keys(t)) t[f] += g[f] || 0; } return into; };
@@ -122,6 +188,11 @@ const email = node({
 export default workflow('tpNTZVkWoiWgSI9n', 'WGF — Daily Collection')
   .add(schedule)
   .to(sync)
+  .to(listGoogle)
+  .to(splitGoogle)
+  .to(fetchGoogle)
+  .to(chunkGoogle)
+  .to(storeGoogle)
   .to(makeBatches)
   .to(collect)
   .to(scrape)

@@ -10,6 +10,10 @@
 //   Collection calls accept { "batch": i, "batches": n, "skip_sync": true } to split sources by id
 //   so no single call exceeds the edge runtime CPU limit.
 //
+// POST /functions/v1/wgf-collect   { "mode": "sources", "channels": ["google_news"] }  → active feeds to fetch elsewhere.
+//   Collection also accepts { "prefetched": [{ "source_id", "status", "body", "error" }] }: feeds fetched by n8n
+//   (Google News blocks some Supabase egress IPs), parsed and stored here.
+//
 // POST /functions/v1/wgf-collect   { "mode": "ingest", "channel": "newsletter", "items": [...] }
 //   → inserts externally collected items (e.g. newsletter deal lines parsed by n8n).
 //
@@ -217,6 +221,9 @@ async function collect(body: Record<string, unknown>) {
   let sources = await sql<Source[]>`select id, region, market, source, language, channel, priority, url, settings
                                    from wgf.sources where active and channel = any(${channels}) and url is not null`;
   if (Array.isArray(body.only_source_ids)) sources = sources.filter((s) => (body.only_source_ids as number[]).includes(Number(s.id)));
+  const pre = new Map((Array.isArray(body.prefetched) ? body.prefetched as Record<string, unknown>[] : [])
+    .map((p) => [Number(p.source_id), p]));
+  if (pre.size) sources = sources.filter((s) => pre.has(Number(s.id)));
   // Batching keeps each call under the edge runtime's CPU limit: { "batch": 0, "batches": 8 }.
   const batches = Number(body.batches) || 1;
   if (batches > 1) sources = sources.filter((s) => Number(s.id) % batches === Number(body.batch ?? 0));
@@ -229,6 +236,10 @@ async function collect(body: Record<string, unknown>) {
         if (!apifyToken) throw new Error("APIFY_TOKEN secret not set");
         items = await scrapePage(s, apifyToken);
         items = items.map((i) => ({ ...i, url: `${i.url}#wgf-day=${day}`, published_at: now.toISOString() }));
+      } else if (pre.size) {
+        const p = pre.get(Number(s.id))!;
+        if (p.error || Number(p.status) >= 400) throw new Error(String(p.error ?? `HTTP ${p.status}`));
+        items = parseFeed(String(p.body ?? ""));
       } else {
         items = parseFeed(await fetchText(s.url!));
       }
@@ -310,6 +321,11 @@ Deno.serve(async (req) => {
   try {
     const body = await req.json().catch(() => ({}));
     if (body.mode === "sync") return json({ synced_sources: await syncSources() });
+    if (body.mode === "sources") {
+      const feeds = await sql`select id, source, url from wgf.sources
+                              where active and channel = any(${(body.channels as string[]) ?? ["google_news"]}) and url is not null order by id`;
+      return json({ feeds });
+    }
     return json(body.mode === "ingest" ? await ingest(body) : await collect(body));
   } catch (e) {
     return json({ error: String((e as Error).message ?? e) }, 500);
