@@ -1,66 +1,66 @@
 region,market,language,query,hl,gl,ceid,feed_url
-APAC,Japan,Japanese,資金調達 シリーズ,ja,JP,JP:ja,https://news.google.com/rss/search?q=%E8%B3%87%E9%87%91%E8%AA%BF%E9%81%94%20%E3%82%B7%E3%83%AA%E3%83%BC%E3%82%BA%20when%3A7d&hl=ja&gl=JP&ceid=JP:ja
-APAC,Japan,Japanese,資金調達 シード,ja,JP,JP:ja,https://news.google.com/rss/search?q=%E8%B3%87%E9%87%91%E8%AA%BF%E9%81%94%20%E3%82%B7%E3%83%BC%E3%83%89%20when%3A7d&hl=ja&gl=JP&ceid=JP:ja
-APAC,South Korea,Korean,투자 유치 시리즈,ko,KR,KR:ko,https://news.google.com/rss/search?q=%ED%88%AC%EC%9E%90%20%EC%9C%A0%EC%B9%98%20%EC%8B%9C%EB%A6%AC%EC%A6%88%20when%3A7d&hl=ko&gl=KR&ceid=KR:ko
-APAC,South Korea,Korean,시드 투자 유치,ko,KR,KR:ko,https://news.google.com/rss/search?q=%EC%8B%9C%EB%93%9C%20%ED%88%AC%EC%9E%90%20%EC%9C%A0%EC%B9%98%20when%3A7d&hl=ko&gl=KR&ceid=KR:ko
-APAC,China,Simplified Chinese,完成 融资 A轮,zh-CN,CN,CN:zh-Hans,https://news.google.com/rss/search?q=%E5%AE%8C%E6%88%90%20%E8%9E%8D%E8%B5%84%20A%E8%BD%AE%20when%3A7d&hl=zh-CN&gl=CN&ceid=CN:zh-Hans
-APAC,China,Simplified Chinese,天使轮 融资,zh-CN,CN,CN:zh-Hans,https://news.google.com/rss/search?q=%E5%A4%A9%E4%BD%BF%E8%BD%AE%20%E8%9E%8D%E8%B5%84%20when%3A7d&hl=zh-CN&gl=CN&ceid=CN:zh-Hans
-APAC,Taiwan,Traditional Chinese,新創 完成 融資,zh-TW,TW,TW:zh-Hant,https://news.google.com/rss/search?q=%E6%96%B0%E5%89%B5%20%E5%AE%8C%E6%88%90%20%E8%9E%8D%E8%B3%87%20when%3A7d&hl=zh-TW&gl=TW&ceid=TW:zh-Hant
-APAC,Hong Kong,Traditional Chinese,初創 融資,zh-HK,HK,HK:zh-Hant,https://news.google.com/rss/search?q=%E5%88%9D%E5%89%B5%20%E8%9E%8D%E8%B3%87%20when%3A7d&hl=zh-HK&gl=HK&ceid=HK:zh-Hant
-APAC,Indonesia,Bahasa Indonesia,startup pendanaan seri,id,ID,ID:id,https://news.google.com/rss/search?q=startup%20pendanaan%20seri%20when%3A7d&hl=id&gl=ID&ceid=ID:id
-APAC,Malaysia,Bahasa Malaysia,syarikat permulaan pembiayaan,ms,MY,MY:ms,https://news.google.com/rss/search?q=syarikat%20permulaan%20pembiayaan%20when%3A7d&hl=ms&gl=MY&ceid=MY:ms
-APAC,Vietnam,Vietnamese,startup gọi vốn vòng,vi,VN,VN:vi,https://news.google.com/rss/search?q=startup%20g%E1%BB%8Di%20v%E1%BB%91n%20v%C3%B2ng%20when%3A7d&hl=vi&gl=VN&ceid=VN:vi
-APAC,Thailand,Thai,สตาร์ทอัพ ระดมทุน ซีรีส์,th,TH,TH:th,https://news.google.com/rss/search?q=%E0%B8%AA%E0%B8%95%E0%B8%B2%E0%B8%A3%E0%B9%8C%E0%B8%97%E0%B8%AD%E0%B8%B1%E0%B8%9E%20%E0%B8%A3%E0%B8%B0%E0%B8%94%E0%B8%A1%E0%B8%97%E0%B8%B8%E0%B8%99%20%E0%B8%8B%E0%B8%B5%E0%B8%A3%E0%B8%B5%E0%B8%AA%E0%B9%8C%20when%3A7d&hl=th&gl=TH&ceid=TH:th
-APAC,India,English,startup raises Series funding,en-IN,IN,IN:en,https://news.google.com/rss/search?q=startup%20raises%20Series%20funding%20when%3A7d&hl=en-IN&gl=IN&ceid=IN:en
-APAC,Australia,English,startup raises seed Series,en-AU,AU,AU:en,https://news.google.com/rss/search?q=startup%20raises%20seed%20Series%20when%3A7d&hl=en-AU&gl=AU&ceid=AU:en
-APAC,New Zealand,English,startup raises funding,en-NZ,NZ,NZ:en,https://news.google.com/rss/search?q=startup%20raises%20funding%20when%3A7d&hl=en-NZ&gl=NZ&ceid=NZ:en
-APAC,Singapore,English,startup raises Series funding,en-SG,SG,SG:en,https://news.google.com/rss/search?q=startup%20raises%20Series%20funding%20when%3A7d&hl=en-SG&gl=SG&ceid=SG:en
-APAC,Philippines,English,startup raises funding,en-PH,PH,PH:en,https://news.google.com/rss/search?q=startup%20raises%20funding%20when%3A7d&hl=en-PH&gl=PH&ceid=PH:en
-APAC,Malaysia,English,startup raises funding,en-MY,MY,MY:en,https://news.google.com/rss/search?q=startup%20raises%20funding%20when%3A7d&hl=en-MY&gl=MY&ceid=MY:en
-Europe,United Kingdom,English,startup raises seed Series A,en-GB,GB,GB:en,https://news.google.com/rss/search?q=startup%20raises%20seed%20Series%20A%20when%3A7d&hl=en-GB&gl=GB&ceid=GB:en
-Europe,Ireland,English,startup raises funding,en-IE,IE,IE:en,https://news.google.com/rss/search?q=startup%20raises%20funding%20when%3A7d&hl=en-IE&gl=IE&ceid=IE:en
-Europe,Germany,German,Startup Finanzierungsrunde Millionen,de,DE,DE:de,https://news.google.com/rss/search?q=Startup%20Finanzierungsrunde%20Millionen%20when%3A7d&hl=de&gl=DE&ceid=DE:de
-Europe,Austria,German,Startup Finanzierungsrunde,de,AT,AT:de,https://news.google.com/rss/search?q=Startup%20Finanzierungsrunde%20when%3A7d&hl=de&gl=AT&ceid=AT:de
-Europe,Switzerland,German,Startup Finanzierungsrunde,de,CH,CH:de,https://news.google.com/rss/search?q=Startup%20Finanzierungsrunde%20when%3A7d&hl=de&gl=CH&ceid=CH:de
-Europe,Switzerland,French,start-up lève millions,fr,CH,CH:fr,https://news.google.com/rss/search?q=start-up%20l%C3%A8ve%20millions%20when%3A7d&hl=fr&gl=CH&ceid=CH:fr
-Europe,France,French,start-up lève millions d'euros,fr,FR,FR:fr,https://news.google.com/rss/search?q=start-up%20l%C3%A8ve%20millions%20d%27euros%20when%3A7d&hl=fr&gl=FR&ceid=FR:fr
-Europe,Belgium,French,start-up lève millions,fr,BE,BE:fr,https://news.google.com/rss/search?q=start-up%20l%C3%A8ve%20millions%20when%3A7d&hl=fr&gl=BE&ceid=BE:fr
-Europe,Belgium,Dutch,startup haalt miljoen op,nl,BE,BE:nl,https://news.google.com/rss/search?q=startup%20haalt%20miljoen%20op%20when%3A7d&hl=nl&gl=BE&ceid=BE:nl
-Europe,Netherlands,Dutch,startup haalt miljoen op,nl,NL,NL:nl,https://news.google.com/rss/search?q=startup%20haalt%20miljoen%20op%20when%3A7d&hl=nl&gl=NL&ceid=NL:nl
-Europe,Sweden,Swedish,startup tar in miljoner,sv,SE,SE:sv,https://news.google.com/rss/search?q=startup%20tar%20in%20miljoner%20when%3A7d&hl=sv&gl=SE&ceid=SE:sv
-Europe,Norway,Norwegian,oppstartsselskap henter millioner,no,NO,NO:no,https://news.google.com/rss/search?q=oppstartsselskap%20henter%20millioner%20when%3A7d&hl=no&gl=NO&ceid=NO:no
-Europe,Denmark,Danish,startup rejser millioner,da,DK,DK:da,https://news.google.com/rss/search?q=startup%20rejser%20millioner%20when%3A7d&hl=da&gl=DK&ceid=DK:da
-Europe,Finland,Finnish,startup kerää rahoitusta,fi,FI,FI:fi,https://news.google.com/rss/search?q=startup%20ker%C3%A4%C3%A4%20rahoitusta%20when%3A7d&hl=fi&gl=FI&ceid=FI:fi
-Europe,Spain,Spanish,startup ronda de financiación,es,ES,ES:es,https://news.google.com/rss/search?q=startup%20ronda%20de%20financiaci%C3%B3n%20when%3A7d&hl=es&gl=ES&ceid=ES:es
-Europe,Portugal,Portuguese,startup ronda de investimento,pt-PT,PT,PT:pt-150,https://news.google.com/rss/search?q=startup%20ronda%20de%20investimento%20when%3A7d&hl=pt-PT&gl=PT&ceid=PT:pt-150
-Europe,Italy,Italian,startup round milioni,it,IT,IT:it,https://news.google.com/rss/search?q=startup%20round%20milioni%20when%3A7d&hl=it&gl=IT&ceid=IT:it
-Europe,Poland,Polish,startup pozyskał finansowanie,pl,PL,PL:pl,https://news.google.com/rss/search?q=startup%20pozyska%C5%82%20finansowanie%20when%3A7d&hl=pl&gl=PL&ceid=PL:pl
-Europe,Czech Republic,Czech,startup získal investici,cs,CZ,CZ:cs,https://news.google.com/rss/search?q=startup%20z%C3%ADskal%20investici%20when%3A7d&hl=cs&gl=CZ&ceid=CZ:cs
-Europe,Romania,Romanian,startup finanțare rundă,ro,RO,RO:ro,https://news.google.com/rss/search?q=startup%20finan%C8%9Bare%20rund%C4%83%20when%3A7d&hl=ro&gl=RO&ceid=RO:ro
-Europe,Hungary,Hungarian,startup befektetés millió,hu,HU,HU:hu,https://news.google.com/rss/search?q=startup%20befektet%C3%A9s%20milli%C3%B3%20when%3A7d&hl=hu&gl=HU&ceid=HU:hu
-Europe,Greece,Greek,startup χρηματοδότηση,el,GR,GR:el,https://news.google.com/rss/search?q=startup%20%CF%87%CF%81%CE%B7%CE%BC%CE%B1%CF%84%CE%BF%CE%B4%CF%8C%CF%84%CE%B7%CF%83%CE%B7%20when%3A7d&hl=el&gl=GR&ceid=GR:el
-Americas,United States,English,startup raises seed round,en-US,US,US:en,https://news.google.com/rss/search?q=startup%20raises%20seed%20round%20when%3A7d&hl=en-US&gl=US&ceid=US:en
-Americas,United States,English,startup raises Series A,en-US,US,US:en,https://news.google.com/rss/search?q=startup%20raises%20Series%20A%20when%3A7d&hl=en-US&gl=US&ceid=US:en
-Americas,United States,English,startup raises Series B,en-US,US,US:en,https://news.google.com/rss/search?q=startup%20raises%20Series%20B%20when%3A7d&hl=en-US&gl=US&ceid=US:en
-Americas,Canada,English,startup raises funding,en-CA,CA,CA:en,https://news.google.com/rss/search?q=startup%20raises%20funding%20when%3A7d&hl=en-CA&gl=CA&ceid=CA:en
-Americas,Canada,French,start-up québécoise financement,fr-CA,CA,CA:fr,https://news.google.com/rss/search?q=start-up%20qu%C3%A9b%C3%A9coise%20financement%20when%3A7d&hl=fr-CA&gl=CA&ceid=CA:fr
-Americas,Brazil,Portuguese,startup rodada de investimento,pt-BR,BR,BR:pt-419,https://news.google.com/rss/search?q=startup%20rodada%20de%20investimento%20when%3A7d&hl=pt-BR&gl=BR&ceid=BR:pt-419
-Americas,Brazil,Portuguese,startup capta milhões,pt-BR,BR,BR:pt-419,https://news.google.com/rss/search?q=startup%20capta%20milh%C3%B5es%20when%3A7d&hl=pt-BR&gl=BR&ceid=BR:pt-419
-Americas,Mexico,Spanish,startup ronda de inversión,es-419,MX,MX:es-419,https://news.google.com/rss/search?q=startup%20ronda%20de%20inversi%C3%B3n%20when%3A7d&hl=es-419&gl=MX&ceid=MX:es-419
-Americas,Argentina,Spanish,startup ronda de inversión,es-419,AR,AR:es-419,https://news.google.com/rss/search?q=startup%20ronda%20de%20inversi%C3%B3n%20when%3A7d&hl=es-419&gl=AR&ceid=AR:es-419
-Americas,Chile,Spanish,startup ronda de inversión,es-419,CL,CL:es-419,https://news.google.com/rss/search?q=startup%20ronda%20de%20inversi%C3%B3n%20when%3A7d&hl=es-419&gl=CL&ceid=CL:es-419
-Americas,Colombia,Spanish,startup ronda de inversión,es-419,CO,CO:es-419,https://news.google.com/rss/search?q=startup%20ronda%20de%20inversi%C3%B3n%20when%3A7d&hl=es-419&gl=CO&ceid=CO:es-419
-Americas,Peru,Spanish,startup ronda de inversión,es-419,PE,PE:es-419,https://news.google.com/rss/search?q=startup%20ronda%20de%20inversi%C3%B3n%20when%3A7d&hl=es-419&gl=PE&ceid=PE:es-419
-Africa,Nigeria,English,startup raises funding,en-NG,NG,NG:en,https://news.google.com/rss/search?q=startup%20raises%20funding%20when%3A7d&hl=en-NG&gl=NG&ceid=NG:en
-Africa,Kenya,English,startup raises funding,en-KE,KE,KE:en,https://news.google.com/rss/search?q=startup%20raises%20funding%20when%3A7d&hl=en-KE&gl=KE&ceid=KE:en
-Africa,South Africa,English,startup raises funding,en-ZA,ZA,ZA:en,https://news.google.com/rss/search?q=startup%20raises%20funding%20when%3A7d&hl=en-ZA&gl=ZA&ceid=ZA:en
-Africa,Ghana,English,startup raises funding,en-GH,GH,GH:en,https://news.google.com/rss/search?q=startup%20raises%20funding%20when%3A7d&hl=en-GH&gl=GH&ceid=GH:en
-Africa,Egypt,English,startup raises funding,en-EG,EG,EG:en,https://news.google.com/rss/search?q=startup%20raises%20funding%20when%3A7d&hl=en-EG&gl=EG&ceid=EG:en
-Africa,Egypt,Arabic,شركة ناشئة جولة تمويل,ar,EG,EG:ar,https://news.google.com/rss/search?q=%D8%B4%D8%B1%D9%83%D8%A9%20%D9%86%D8%A7%D8%B4%D8%A6%D8%A9%20%D8%AC%D9%88%D9%84%D8%A9%20%D8%AA%D9%85%D9%88%D9%8A%D9%84%20when%3A7d&hl=ar&gl=EG&ceid=EG:ar
-Africa,Morocco,French,startup lève fonds,fr,MA,MA:fr,https://news.google.com/rss/search?q=startup%20l%C3%A8ve%20fonds%20when%3A7d&hl=fr&gl=MA&ceid=MA:fr
-Africa,Senegal,French,startup lève fonds,fr,SN,SN:fr,https://news.google.com/rss/search?q=startup%20l%C3%A8ve%20fonds%20when%3A7d&hl=fr&gl=SN&ceid=SN:fr
-Middle East,Saudi Arabia,Arabic,شركة ناشئة جولة تمويل,ar,SA,SA:ar,https://news.google.com/rss/search?q=%D8%B4%D8%B1%D9%83%D8%A9%20%D9%86%D8%A7%D8%B4%D8%A6%D8%A9%20%D8%AC%D9%88%D9%84%D8%A9%20%D8%AA%D9%85%D9%88%D9%8A%D9%84%20when%3A7d&hl=ar&gl=SA&ceid=SA:ar
-Middle East,United Arab Emirates,English,startup raises funding,en-AE,AE,AE:en,https://news.google.com/rss/search?q=startup%20raises%20funding%20when%3A7d&hl=en-AE&gl=AE&ceid=AE:en
-Middle East,Israel,English,startup raises funding,en-IL,IL,IL:en,https://news.google.com/rss/search?q=startup%20raises%20funding%20when%3A7d&hl=en-IL&gl=IL&ceid=IL:en
-Middle East,Israel,Hebrew,סטארטאפ גייס מיליון,he,IL,IL:he,https://news.google.com/rss/search?q=%D7%A1%D7%98%D7%90%D7%A8%D7%98%D7%90%D7%A4%20%D7%92%D7%99%D7%99%D7%A1%20%D7%9E%D7%99%D7%9C%D7%99%D7%95%D7%9F%20when%3A7d&hl=he&gl=IL&ceid=IL:he
-Middle East,Turkey,Turkish,girişim yatırım aldı,tr,TR,TR:tr,https://news.google.com/rss/search?q=giri%C5%9Fim%20yat%C4%B1r%C4%B1m%20ald%C4%B1%20when%3A7d&hl=tr&gl=TR&ceid=TR:tr
+APAC,Japan,Japanese,資金調達 シリーズ,ja,JP,JP:ja,https://news.google.com/rss/search?q=%E8%B3%87%E9%87%91%E8%AA%BF%E9%81%94%20%E3%82%B7%E3%83%AA%E3%83%BC%E3%82%BA%20when%3A2d&hl=ja&gl=JP&ceid=JP:ja
+APAC,Japan,Japanese,資金調達 シード,ja,JP,JP:ja,https://news.google.com/rss/search?q=%E8%B3%87%E9%87%91%E8%AA%BF%E9%81%94%20%E3%82%B7%E3%83%BC%E3%83%89%20when%3A2d&hl=ja&gl=JP&ceid=JP:ja
+APAC,South Korea,Korean,투자 유치 시리즈,ko,KR,KR:ko,https://news.google.com/rss/search?q=%ED%88%AC%EC%9E%90%20%EC%9C%A0%EC%B9%98%20%EC%8B%9C%EB%A6%AC%EC%A6%88%20when%3A2d&hl=ko&gl=KR&ceid=KR:ko
+APAC,South Korea,Korean,시드 투자 유치,ko,KR,KR:ko,https://news.google.com/rss/search?q=%EC%8B%9C%EB%93%9C%20%ED%88%AC%EC%9E%90%20%EC%9C%A0%EC%B9%98%20when%3A2d&hl=ko&gl=KR&ceid=KR:ko
+APAC,China,Simplified Chinese,完成 融资 A轮,zh-CN,CN,CN:zh-Hans,https://news.google.com/rss/search?q=%E5%AE%8C%E6%88%90%20%E8%9E%8D%E8%B5%84%20A%E8%BD%AE%20when%3A2d&hl=zh-CN&gl=CN&ceid=CN:zh-Hans
+APAC,China,Simplified Chinese,天使轮 融资,zh-CN,CN,CN:zh-Hans,https://news.google.com/rss/search?q=%E5%A4%A9%E4%BD%BF%E8%BD%AE%20%E8%9E%8D%E8%B5%84%20when%3A2d&hl=zh-CN&gl=CN&ceid=CN:zh-Hans
+APAC,Taiwan,Traditional Chinese,新創 完成 融資,zh-TW,TW,TW:zh-Hant,https://news.google.com/rss/search?q=%E6%96%B0%E5%89%B5%20%E5%AE%8C%E6%88%90%20%E8%9E%8D%E8%B3%87%20when%3A2d&hl=zh-TW&gl=TW&ceid=TW:zh-Hant
+APAC,Hong Kong,Traditional Chinese,初創 融資,zh-HK,HK,HK:zh-Hant,https://news.google.com/rss/search?q=%E5%88%9D%E5%89%B5%20%E8%9E%8D%E8%B3%87%20when%3A2d&hl=zh-HK&gl=HK&ceid=HK:zh-Hant
+APAC,Indonesia,Bahasa Indonesia,startup pendanaan seri,id,ID,ID:id,https://news.google.com/rss/search?q=startup%20pendanaan%20seri%20when%3A2d&hl=id&gl=ID&ceid=ID:id
+APAC,Malaysia,Bahasa Malaysia,syarikat permulaan pembiayaan,ms,MY,MY:ms,https://news.google.com/rss/search?q=syarikat%20permulaan%20pembiayaan%20when%3A2d&hl=ms&gl=MY&ceid=MY:ms
+APAC,Vietnam,Vietnamese,startup gọi vốn vòng,vi,VN,VN:vi,https://news.google.com/rss/search?q=startup%20g%E1%BB%8Di%20v%E1%BB%91n%20v%C3%B2ng%20when%3A2d&hl=vi&gl=VN&ceid=VN:vi
+APAC,Thailand,Thai,สตาร์ทอัพ ระดมทุน ซีรีส์,th,TH,TH:th,https://news.google.com/rss/search?q=%E0%B8%AA%E0%B8%95%E0%B8%B2%E0%B8%A3%E0%B9%8C%E0%B8%97%E0%B8%AD%E0%B8%B1%E0%B8%9E%20%E0%B8%A3%E0%B8%B0%E0%B8%94%E0%B8%A1%E0%B8%97%E0%B8%B8%E0%B8%99%20%E0%B8%8B%E0%B8%B5%E0%B8%A3%E0%B8%B5%E0%B8%AA%E0%B9%8C%20when%3A2d&hl=th&gl=TH&ceid=TH:th
+APAC,India,English,startup raises Series funding,en-IN,IN,IN:en,https://news.google.com/rss/search?q=startup%20raises%20Series%20funding%20when%3A2d&hl=en-IN&gl=IN&ceid=IN:en
+APAC,Australia,English,startup raises seed Series,en-AU,AU,AU:en,https://news.google.com/rss/search?q=startup%20raises%20seed%20Series%20when%3A2d&hl=en-AU&gl=AU&ceid=AU:en
+APAC,New Zealand,English,startup raises funding,en-NZ,NZ,NZ:en,https://news.google.com/rss/search?q=startup%20raises%20funding%20when%3A2d&hl=en-NZ&gl=NZ&ceid=NZ:en
+APAC,Singapore,English,startup raises Series funding,en-SG,SG,SG:en,https://news.google.com/rss/search?q=startup%20raises%20Series%20funding%20when%3A2d&hl=en-SG&gl=SG&ceid=SG:en
+APAC,Philippines,English,startup raises funding,en-PH,PH,PH:en,https://news.google.com/rss/search?q=startup%20raises%20funding%20when%3A2d&hl=en-PH&gl=PH&ceid=PH:en
+APAC,Malaysia,English,startup raises funding,en-MY,MY,MY:en,https://news.google.com/rss/search?q=startup%20raises%20funding%20when%3A2d&hl=en-MY&gl=MY&ceid=MY:en
+Europe,United Kingdom,English,startup raises seed Series A,en-GB,GB,GB:en,https://news.google.com/rss/search?q=startup%20raises%20seed%20Series%20A%20when%3A2d&hl=en-GB&gl=GB&ceid=GB:en
+Europe,Ireland,English,startup raises funding,en-IE,IE,IE:en,https://news.google.com/rss/search?q=startup%20raises%20funding%20when%3A2d&hl=en-IE&gl=IE&ceid=IE:en
+Europe,Germany,German,Startup Finanzierungsrunde Millionen,de,DE,DE:de,https://news.google.com/rss/search?q=Startup%20Finanzierungsrunde%20Millionen%20when%3A2d&hl=de&gl=DE&ceid=DE:de
+Europe,Austria,German,Startup Finanzierungsrunde,de,AT,AT:de,https://news.google.com/rss/search?q=Startup%20Finanzierungsrunde%20when%3A2d&hl=de&gl=AT&ceid=AT:de
+Europe,Switzerland,German,Startup Finanzierungsrunde,de,CH,CH:de,https://news.google.com/rss/search?q=Startup%20Finanzierungsrunde%20when%3A2d&hl=de&gl=CH&ceid=CH:de
+Europe,Switzerland,French,start-up lève millions,fr,CH,CH:fr,https://news.google.com/rss/search?q=start-up%20l%C3%A8ve%20millions%20when%3A2d&hl=fr&gl=CH&ceid=CH:fr
+Europe,France,French,start-up lève millions d'euros,fr,FR,FR:fr,https://news.google.com/rss/search?q=start-up%20l%C3%A8ve%20millions%20d%27euros%20when%3A2d&hl=fr&gl=FR&ceid=FR:fr
+Europe,Belgium,French,start-up lève millions,fr,BE,BE:fr,https://news.google.com/rss/search?q=start-up%20l%C3%A8ve%20millions%20when%3A2d&hl=fr&gl=BE&ceid=BE:fr
+Europe,Belgium,Dutch,startup haalt miljoen op,nl,BE,BE:nl,https://news.google.com/rss/search?q=startup%20haalt%20miljoen%20op%20when%3A2d&hl=nl&gl=BE&ceid=BE:nl
+Europe,Netherlands,Dutch,startup haalt miljoen op,nl,NL,NL:nl,https://news.google.com/rss/search?q=startup%20haalt%20miljoen%20op%20when%3A2d&hl=nl&gl=NL&ceid=NL:nl
+Europe,Sweden,Swedish,startup tar in miljoner,sv,SE,SE:sv,https://news.google.com/rss/search?q=startup%20tar%20in%20miljoner%20when%3A2d&hl=sv&gl=SE&ceid=SE:sv
+Europe,Norway,Norwegian,oppstartsselskap henter millioner,no,NO,NO:no,https://news.google.com/rss/search?q=oppstartsselskap%20henter%20millioner%20when%3A2d&hl=no&gl=NO&ceid=NO:no
+Europe,Denmark,Danish,startup rejser millioner,da,DK,DK:da,https://news.google.com/rss/search?q=startup%20rejser%20millioner%20when%3A2d&hl=da&gl=DK&ceid=DK:da
+Europe,Finland,Finnish,startup kerää rahoitusta,fi,FI,FI:fi,https://news.google.com/rss/search?q=startup%20ker%C3%A4%C3%A4%20rahoitusta%20when%3A2d&hl=fi&gl=FI&ceid=FI:fi
+Europe,Spain,Spanish,startup ronda de financiación,es,ES,ES:es,https://news.google.com/rss/search?q=startup%20ronda%20de%20financiaci%C3%B3n%20when%3A2d&hl=es&gl=ES&ceid=ES:es
+Europe,Portugal,Portuguese,startup ronda de investimento,pt-PT,PT,PT:pt-150,https://news.google.com/rss/search?q=startup%20ronda%20de%20investimento%20when%3A2d&hl=pt-PT&gl=PT&ceid=PT:pt-150
+Europe,Italy,Italian,startup round milioni,it,IT,IT:it,https://news.google.com/rss/search?q=startup%20round%20milioni%20when%3A2d&hl=it&gl=IT&ceid=IT:it
+Europe,Poland,Polish,startup pozyskał finansowanie,pl,PL,PL:pl,https://news.google.com/rss/search?q=startup%20pozyska%C5%82%20finansowanie%20when%3A2d&hl=pl&gl=PL&ceid=PL:pl
+Europe,Czech Republic,Czech,startup získal investici,cs,CZ,CZ:cs,https://news.google.com/rss/search?q=startup%20z%C3%ADskal%20investici%20when%3A2d&hl=cs&gl=CZ&ceid=CZ:cs
+Europe,Romania,Romanian,startup finanțare rundă,ro,RO,RO:ro,https://news.google.com/rss/search?q=startup%20finan%C8%9Bare%20rund%C4%83%20when%3A2d&hl=ro&gl=RO&ceid=RO:ro
+Europe,Hungary,Hungarian,startup befektetés millió,hu,HU,HU:hu,https://news.google.com/rss/search?q=startup%20befektet%C3%A9s%20milli%C3%B3%20when%3A2d&hl=hu&gl=HU&ceid=HU:hu
+Europe,Greece,Greek,startup χρηματοδότηση,el,GR,GR:el,https://news.google.com/rss/search?q=startup%20%CF%87%CF%81%CE%B7%CE%BC%CE%B1%CF%84%CE%BF%CE%B4%CF%8C%CF%84%CE%B7%CF%83%CE%B7%20when%3A2d&hl=el&gl=GR&ceid=GR:el
+Americas,United States,English,startup raises seed round,en-US,US,US:en,https://news.google.com/rss/search?q=startup%20raises%20seed%20round%20when%3A2d&hl=en-US&gl=US&ceid=US:en
+Americas,United States,English,startup raises Series A,en-US,US,US:en,https://news.google.com/rss/search?q=startup%20raises%20Series%20A%20when%3A2d&hl=en-US&gl=US&ceid=US:en
+Americas,United States,English,startup raises Series B,en-US,US,US:en,https://news.google.com/rss/search?q=startup%20raises%20Series%20B%20when%3A2d&hl=en-US&gl=US&ceid=US:en
+Americas,Canada,English,startup raises funding,en-CA,CA,CA:en,https://news.google.com/rss/search?q=startup%20raises%20funding%20when%3A2d&hl=en-CA&gl=CA&ceid=CA:en
+Americas,Canada,French,start-up québécoise financement,fr-CA,CA,CA:fr,https://news.google.com/rss/search?q=start-up%20qu%C3%A9b%C3%A9coise%20financement%20when%3A2d&hl=fr-CA&gl=CA&ceid=CA:fr
+Americas,Brazil,Portuguese,startup rodada de investimento,pt-BR,BR,BR:pt-419,https://news.google.com/rss/search?q=startup%20rodada%20de%20investimento%20when%3A2d&hl=pt-BR&gl=BR&ceid=BR:pt-419
+Americas,Brazil,Portuguese,startup capta milhões,pt-BR,BR,BR:pt-419,https://news.google.com/rss/search?q=startup%20capta%20milh%C3%B5es%20when%3A2d&hl=pt-BR&gl=BR&ceid=BR:pt-419
+Americas,Mexico,Spanish,startup ronda de inversión,es-419,MX,MX:es-419,https://news.google.com/rss/search?q=startup%20ronda%20de%20inversi%C3%B3n%20when%3A2d&hl=es-419&gl=MX&ceid=MX:es-419
+Americas,Argentina,Spanish,startup ronda de inversión,es-419,AR,AR:es-419,https://news.google.com/rss/search?q=startup%20ronda%20de%20inversi%C3%B3n%20when%3A2d&hl=es-419&gl=AR&ceid=AR:es-419
+Americas,Chile,Spanish,startup ronda de inversión,es-419,CL,CL:es-419,https://news.google.com/rss/search?q=startup%20ronda%20de%20inversi%C3%B3n%20when%3A2d&hl=es-419&gl=CL&ceid=CL:es-419
+Americas,Colombia,Spanish,startup ronda de inversión,es-419,CO,CO:es-419,https://news.google.com/rss/search?q=startup%20ronda%20de%20inversi%C3%B3n%20when%3A2d&hl=es-419&gl=CO&ceid=CO:es-419
+Americas,Peru,Spanish,startup ronda de inversión,es-419,PE,PE:es-419,https://news.google.com/rss/search?q=startup%20ronda%20de%20inversi%C3%B3n%20when%3A2d&hl=es-419&gl=PE&ceid=PE:es-419
+Africa,Nigeria,English,startup raises funding,en-NG,NG,NG:en,https://news.google.com/rss/search?q=startup%20raises%20funding%20when%3A2d&hl=en-NG&gl=NG&ceid=NG:en
+Africa,Kenya,English,startup raises funding,en-KE,KE,KE:en,https://news.google.com/rss/search?q=startup%20raises%20funding%20when%3A2d&hl=en-KE&gl=KE&ceid=KE:en
+Africa,South Africa,English,startup raises funding,en-ZA,ZA,ZA:en,https://news.google.com/rss/search?q=startup%20raises%20funding%20when%3A2d&hl=en-ZA&gl=ZA&ceid=ZA:en
+Africa,Ghana,English,startup raises funding,en-GH,GH,GH:en,https://news.google.com/rss/search?q=startup%20raises%20funding%20when%3A2d&hl=en-GH&gl=GH&ceid=GH:en
+Africa,Egypt,English,startup raises funding,en-EG,EG,EG:en,https://news.google.com/rss/search?q=startup%20raises%20funding%20when%3A2d&hl=en-EG&gl=EG&ceid=EG:en
+Africa,Egypt,Arabic,شركة ناشئة جولة تمويل,ar,EG,EG:ar,https://news.google.com/rss/search?q=%D8%B4%D8%B1%D9%83%D8%A9%20%D9%86%D8%A7%D8%B4%D8%A6%D8%A9%20%D8%AC%D9%88%D9%84%D8%A9%20%D8%AA%D9%85%D9%88%D9%8A%D9%84%20when%3A2d&hl=ar&gl=EG&ceid=EG:ar
+Africa,Morocco,French,startup lève fonds,fr,MA,MA:fr,https://news.google.com/rss/search?q=startup%20l%C3%A8ve%20fonds%20when%3A2d&hl=fr&gl=MA&ceid=MA:fr
+Africa,Senegal,French,startup lève fonds,fr,SN,SN:fr,https://news.google.com/rss/search?q=startup%20l%C3%A8ve%20fonds%20when%3A2d&hl=fr&gl=SN&ceid=SN:fr
+Middle East,Saudi Arabia,Arabic,شركة ناشئة جولة تمويل,ar,SA,SA:ar,https://news.google.com/rss/search?q=%D8%B4%D8%B1%D9%83%D8%A9%20%D9%86%D8%A7%D8%B4%D8%A6%D8%A9%20%D8%AC%D9%88%D9%84%D8%A9%20%D8%AA%D9%85%D9%88%D9%8A%D9%84%20when%3A2d&hl=ar&gl=SA&ceid=SA:ar
+Middle East,United Arab Emirates,English,startup raises funding,en-AE,AE,AE:en,https://news.google.com/rss/search?q=startup%20raises%20funding%20when%3A2d&hl=en-AE&gl=AE&ceid=AE:en
+Middle East,Israel,English,startup raises funding,en-IL,IL,IL:en,https://news.google.com/rss/search?q=startup%20raises%20funding%20when%3A2d&hl=en-IL&gl=IL&ceid=IL:en
+Middle East,Israel,Hebrew,סטארטאפ גייס מיליון,he,IL,IL:he,https://news.google.com/rss/search?q=%D7%A1%D7%98%D7%90%D7%A8%D7%98%D7%90%D7%A4%20%D7%92%D7%99%D7%99%D7%A1%20%D7%9E%D7%99%D7%9C%D7%99%D7%95%D7%9F%20when%3A2d&hl=he&gl=IL&ceid=IL:he
+Middle East,Turkey,Turkish,girişim yatırım aldı,tr,TR,TR:tr,https://news.google.com/rss/search?q=giri%C5%9Fim%20yat%C4%B1r%C4%B1m%20ald%C4%B1%20when%3A2d&hl=tr&gl=TR&ceid=TR:tr

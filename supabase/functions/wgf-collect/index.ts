@@ -1,9 +1,10 @@
-// What Got Funded — weekly collection
+// What Got Funded — daily collection
 //
 // POST /functions/v1/wgf-collect   (header: x-wgf-token)
-//   { "channels": ["rss","google_news","apify"], "week": "2026-10-10", "only_source_ids": [..] }
-//   → syncs the source registry from GitHub, fetches every active feed/page,
-//     writes new items to wgf.raw_items and one wgf.source_health row per source.
+//   { "channels": ["rss","google_news","apify"], "window_hours": 48, "only_source_ids": [..] }
+//   → syncs the source registry from GitHub, fetches every active feed/page, keeps items
+//     published in the last `window_hours`, writes new ones to wgf.raw_items (duplicate URLs
+//     are skipped) and one wgf.source_health row per source for today.
 //
 // POST /functions/v1/wgf-collect   { "mode": "sync" }  → only syncs the source registry from GitHub.
 //   Collection calls accept { "batch": i, "batches": n, "skip_sync": true } to split sources by id
@@ -12,7 +13,8 @@
 // POST /functions/v1/wgf-collect   { "mode": "ingest", "channel": "newsletter", "items": [...] }
 //   → inserts externally collected items (e.g. newsletter deal lines parsed by n8n).
 //
-// Reporting week = Saturday 00:00 to Friday 23:59 UTC. Default week = the last completed one.
+// Daily cadence: runs every morning; the daily edition carries every round first found since the
+// previous edition. `week` (Saturday start, UTC) is kept on each item for weekly reports.
 
 import postgres from "npm:postgres@3.4.4";
 import { XMLParser } from "npm:fast-xml-parser@4.4.1";
@@ -204,13 +206,13 @@ async function scrapePage(s: Source, token: string): Promise<Item[]> {
 
 async function collect(body: Record<string, unknown>) {
   const channels = (body.channels as string[]) ?? ["rss", "google_news", "apify"];
-  const week = body.week ? new Date(`${body.week}T00:00:00Z`) : (() => { const w = weekStart(new Date()); w.setUTCDate(w.getUTCDate() - 7); return w; })();
-  if (week.getUTCDay() !== 6) throw new Error("week must be a Saturday (UTC)");
-  const weekEnd = new Date(+week + 7 * 86400_000);
-  const graceStart = new Date(+week - 7 * 86400_000); // late reports: announced up to a week before
+  const now = new Date();
+  const day = iso(now);
+  const windowStart = new Date(+now - (Number(body.window_hours) || 48) * 3600_000);
+  const windowEnd = new Date(+now + 3600_000); // tolerate feeds with slightly future timestamps
 
   const synced = body.skip_sync ? null : await syncSources();
-  const [run] = await sql`insert into wgf.runs (week, channel) values (${iso(week)}, ${channels.join(",")}) returning id`;
+  const [run] = await sql`insert into wgf.runs (day, week, channel) values (${day}, ${iso(weekStart(now))}, ${channels.join(",")}) returning id`;
 
   let sources = await sql<Source[]>`select id, region, market, source, language, channel, priority, url, settings
                                    from wgf.sources where active and channel = any(${channels}) and url is not null`;
@@ -220,13 +222,13 @@ async function collect(body: Record<string, unknown>) {
   if (batches > 1) sources = sources.filter((s) => Number(s.id) % batches === Number(body.batch ?? 0));
 
   const apifyToken = Deno.env.get("APIFY_TOKEN");
-  const results = await pool(sources, CONCURRENCY, async (s) => {
+  const results = await pool(sources, Number(body.concurrency) || CONCURRENCY, async (s) => {
     try {
       let items: Item[];
       if (s.channel === "apify") {
         if (!apifyToken) throw new Error("APIFY_TOKEN secret not set");
         items = await scrapePage(s, apifyToken);
-        items = items.map((i) => ({ ...i, url: `${i.url}#wgf-week=${iso(week)}`, published_at: weekEnd.toISOString() }));
+        items = items.map((i) => ({ ...i, url: `${i.url}#wgf-day=${day}`, published_at: now.toISOString() }));
       } else {
         items = parseFeed(await fetchText(s.url!));
       }
@@ -235,7 +237,7 @@ async function collect(body: Record<string, unknown>) {
         if (s.channel === "apify") return true;
         if (!i.published_at) return false;
         const t = new Date(i.published_at);
-        return t >= graceStart && t < weekEnd;
+        return t >= windowStart && t < windowEnd;
       });
       if (s.channel === "rss" && s.priority === 2) items = items.filter((i) => FUNDING_RE.test(`${i.title} ${i.content ?? ""}`.slice(0, 2000)));
       return { s, fetched, items, error: null as string | null };
@@ -247,23 +249,23 @@ async function collect(body: Record<string, unknown>) {
   const allRows = results.flatMap((r) => r.items.map((i) => ({
     source_id: r.s.id, channel: r.s.channel, url: i.url.slice(0, 2000), title: i.title, content: i.content,
     published_at: i.published_at,
-    week: iso(i.published_at && new Date(i.published_at) >= week ? weekStart(new Date(i.published_at)) : week),
+    week: iso(weekStart(new Date(i.published_at ?? now))), day,
     run_id: run.id,
   })));
   let inserted = 0;
   for (let k = 0; k < allRows.length; k += 500) {
-    const res = await sql`insert into wgf.raw_items ${sql(allRows.slice(k, k + 500), "source_id", "channel", "url", "title", "content", "published_at", "week", "run_id")}
+    const res = await sql`insert into wgf.raw_items ${sql(allRows.slice(k, k + 500), "source_id", "channel", "url", "title", "content", "published_at", "week", "day", "run_id")}
                           on conflict (url) do nothing returning id`;
     inserted += res.length;
   }
 
   const health = results.map((r) => ({
-    source_id: r.s.id, week: iso(week), run_id: run.id, items_fetched: r.fetched, funding_items: r.items.length,
+    source_id: r.s.id, day, run_id: run.id, items_fetched: r.fetched, funding_items: r.items.length,
     errors: r.error, status: r.error ? "error" : r.items.length ? "ok" : "empty",
   }));
   if (health.length) {
-    await sql`insert into wgf.source_health ${sql(health, "source_id", "week", "run_id", "items_fetched", "funding_items", "errors", "status")}
-              on conflict (source_id, week) do update set run_id = excluded.run_id, items_fetched = excluded.items_fetched,
+    await sql`insert into wgf.source_health ${sql(health, "source_id", "day", "run_id", "items_fetched", "funding_items", "errors", "status")}
+              on conflict (source_id, day) do update set run_id = excluded.run_id, items_fetched = excluded.items_fetched,
                 funding_items = excluded.funding_items, errors = excluded.errors, status = excluded.status, checked_at = now()`;
   }
 
@@ -276,7 +278,7 @@ async function collect(body: Record<string, unknown>) {
     return m;
   };
   const stats = {
-    week: iso(week), synced_sources: synced, sources_polled: results.length, new_raw_items: inserted,
+    day, synced_sources: synced, sources_polled: results.length, new_raw_items: inserted,
     by_channel: by("channel"), by_region: by("region"),
     errors: results.filter((r) => r.error).map((r) => ({ id: r.s.id, source: r.s.source, channel: r.s.channel, error: r.error })),
   };
@@ -292,11 +294,11 @@ async function ingest(body: Record<string, unknown>) {
     return {
       source_id: (i.source_id as number) ?? null, channel, url: String(i.url).slice(0, 2000),
       title: (i.title as string) ?? null, content: (i.content as string) ?? null,
-      published_at: p.toISOString(), week: iso(weekStart(p)), run_id: null,
+      published_at: p.toISOString(), week: iso(weekStart(p)), day: iso(new Date()), run_id: null,
     };
   });
   if (!rows.length) return { inserted: 0 };
-  const res = await sql`insert into wgf.raw_items ${sql(rows, "source_id", "channel", "url", "title", "content", "published_at", "week", "run_id")}
+  const res = await sql`insert into wgf.raw_items ${sql(rows, "source_id", "channel", "url", "title", "content", "published_at", "week", "day", "run_id")}
                         on conflict (url) do nothing returning id`;
   return { inserted: res.length, received: rows.length };
 }
