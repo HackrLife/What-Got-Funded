@@ -51,7 +51,7 @@ const collect = node({
       method: 'POST', url: FN, sendHeaders: true, headerParameters: headers,
       sendBody: true, contentType: 'json', specifyBody: 'json',
       jsonBody: expr('{{ JSON.stringify({ channels: ["rss", "google_news"], skip_sync: true, batch: $json.batch, batches: $json.batches }) }}'),
-      options: { timeout: 300000, batching: { batch: { batchSize: 2, batchInterval: 500 } }, ...lenient },
+      options: { timeout: 300000, batching: { batch: { batchSize: 1, batchInterval: 15000 } }, ...lenient },
     },
   },
 });

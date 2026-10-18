@@ -56,7 +56,20 @@ function weekStart(d: Date): Date {
 }
 const iso = (d: Date) => d.toISOString().slice(0, 10);
 
+// Google News and some publishers rate-limit bursts; retry 429/503 with backoff.
 async function fetchText(url: string, timeoutMs = FEED_TIMEOUT_MS): Promise<string> {
+  for (const wait of [0, 3000, 8000]) {
+    if (wait) await new Promise((r) => setTimeout(r, wait + Math.random() * 1000));
+    try {
+      return await fetchOnce(url, timeoutMs);
+    } catch (e) {
+      if (!/HTTP (429|503)/.test(String((e as Error).message)) || wait === 8000) throw e;
+    }
+  }
+  throw new Error("unreachable");
+}
+
+async function fetchOnce(url: string, timeoutMs: number): Promise<string> {
   const ctl = new AbortController();
   const t = setTimeout(() => ctl.abort(), timeoutMs);
   try {
