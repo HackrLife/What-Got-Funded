@@ -48,7 +48,7 @@ const buildPrompt = node({
       method: 'POST', url: FN, sendHeaders: true, headerParameters: headers,
       sendBody: true, contentType: 'json', specifyBody: 'json',
       jsonBody: expr('{{ JSON.stringify({ mode: "prompt", ids: $json.ids }) }}'),
-      options: { timeout: 60000, ...lenient },
+      options: { timeout: 60000, batching: { batch: { batchSize: 1, batchInterval: 300 } }, ...lenient },
     },
   },
 });
@@ -75,11 +75,12 @@ const saveRounds = node({
   version: 4.4,
   config: {
     name: 'Save rounds',
+    onError: 'continueRegularOutput', retryOnFail: true, maxTries: 3, waitBetweenTries: 3000,
     parameters: {
       method: 'POST', url: FN, sendHeaders: true, headerParameters: headers,
       sendBody: true, contentType: 'json', specifyBody: 'json',
       jsonBody: expr(`{{ JSON.stringify({ mode: "save", ids: $('Build prompt').item.json.ids, text: (($json.content || []).find(b => b.type === 'text') || {}).text || JSON.stringify({ error: $json.error || ('no text block, stop_reason ' + $json.stop_reason) }) }) }}`),
-      options: { timeout: 120000, ...lenient },
+      options: { timeout: 120000, batching: { batch: { batchSize: 1, batchInterval: 1000 } }, ...lenient },
     },
   },
 });

@@ -14,7 +14,7 @@
 
 import postgres from "npm:postgres@3.4.4";
 
-const sql = postgres(Deno.env.get("SUPABASE_DB_URL")!, { prepare: false, max: 4 });
+const sql = postgres(Deno.env.get("SUPABASE_DB_URL")!, { prepare: false, max: 1, idle_timeout: 5 });
 
 const FUNDING_RE = new RegExp(
   [
@@ -36,6 +36,8 @@ const SECTORS = [
   "Media & entertainment", "Gaming", "Travel & hospitality", "Web3 & crypto", "Other",
 ];
 const EXCLUDE_REASONS = ["not_funding", "debt", "grant", "fund_close", "ipo_or_public", "m_and_a", "secondary", "private_equity", "duplicate_listing", "rumour", "other"];
+// Company names that are descriptions, not names ("an undisclosed AI startup")
+const UNNAMED_COMPANY = /^(an? |the )?(undisclosed|unnamed|unidentified|stealth|anonymous)\b/i;
 // Placeholders that are not investor names
 const GENERIC_INVESTOR = /^(existing|new|other|undisclosed|unnamed|several|various|private|individual|angel|strategic|institutional|international|local|family)?\s*(investors?|backers?|angels?|shareholders?|funds?|vcs?|venture capital( firms?)?|family offices?|investment firms?)$|^(others?|undisclosed|n\/a)$/i;
 
@@ -131,6 +133,9 @@ async function save(ids: number[], text: string) {
     const firstPub = itemIds.map((i) => byId.get(i)!.published_at).filter(Boolean).sort()[0] ?? new Date().toISOString();
     const announced = /^\d{4}-\d{2}-\d{2}$/.test(String(r.announced_on)) ? String(r.announced_on) : String(new Date(firstPub).toISOString()).slice(0, 10);
 
+    const status = UNNAMED_COMPANY.test(company) ? "unnamed"
+      : Date.parse(announced) < Date.parse(String(new Date(firstPub).toISOString()).slice(0, 10)) - 30 * 864e5 ? "stale" : "live";
+
     // company: domain first, then name (+ country when both known)
     let [co] = domain ? await sql`select id from wgf.companies where domain = ${domain}` : [];
     if (!co) {
@@ -171,10 +176,10 @@ async function save(ids: number[], text: string) {
     } else {
       created++;
       [rd] = await sql`insert into wgf.rounds (company_id, stage, amount, currency, amount_usd, amount_text, announced_on, week,
-                                               confidence, highlight, headline, edition)
+                                               confidence, highlight, headline, edition, status)
                        values (${co.id}, ${stage}, ${amount}, ${currency}, ${amountUsd}, ${str(r.amount_text, 120)}, ${announced},
                                wgf.week_of(${announced}::date), 'reported', ${str(r.highlight)}, ${byId.get(itemIds[0])!.title},
-                               least(wgf.next_edition(now()), (${firstPub}::timestamptz at time zone 'Australia/Sydney')::date + 1))
+                               least(wgf.next_edition(now()), (${firstPub}::timestamptz at time zone 'Australia/Sydney')::date + 1), ${status})
                        returning id`;
     }
 
