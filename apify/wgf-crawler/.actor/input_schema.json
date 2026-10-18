@@ -1,0 +1,14 @@
+{
+  "title": "What Got Funded crawler input",
+  "type": "object",
+  "schemaVersion": 1,
+  "properties": {
+    "mode": { "title": "Mode", "type": "string", "editor": "select", "enum": ["articles", "companies"], "enumTitles": ["Funding articles (daily crawl)", "Company sites (socials and founders)"], "default": "articles", "description": "articles: crawl all sources for the target day. companies: read the listed company domains." },
+    "targetDate": { "title": "Target day (YYYY-MM-DD)", "type": "string", "editor": "textfield", "description": "Day the rounds were announced. Leave empty for the previous UTC day." },
+    "sourcesRepo": { "title": "Sources folder URL", "type": "string", "editor": "textfield", "default": "https://raw.githubusercontent.com/HackrLife/What-Got-Funded/main/sources", "description": "Raw URL of the folder holding n8n-feeds.csv and scraped-pages.csv." },
+    "domains": { "title": "Company domains", "type": "array", "editor": "stringList", "description": "Used in companies mode only." },
+    "maxArticles": { "title": "Max articles", "type": "integer", "default": 800, "minimum": 10 },
+    "concurrency": { "title": "Concurrency", "type": "integer", "default": 12, "minimum": 1, "maximum": 40 }
+  },
+  "required": []
+}

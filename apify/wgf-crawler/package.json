@@ -1,0 +1,9 @@
+{
+  "name": "wgf-crawler",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "What Got Funded daily crawler (Apify Actor, no dependencies)",
+  "scripts": { "start": "node src/main.js", "test": "node test/run.mjs" },
+  "engines": { "node": ">=22" }
+}

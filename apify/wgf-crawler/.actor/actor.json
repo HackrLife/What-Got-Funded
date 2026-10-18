@@ -1,0 +1,22 @@
+{
+  "actorSpecification": 1,
+  "name": "wgf-crawler",
+  "title": "What Got Funded daily crawler",
+  "description": "Reads every mapped funding source, keeps the previous day's funding articles with full text and links, and reads company sites for social profiles and founder links.",
+  "version": "1.0",
+  "buildTag": "latest",
+  "input": "./input_schema.json",
+  "dockerfile": "../Dockerfile",
+  "storages": {
+    "dataset": {
+      "actorSpecification": 1,
+      "views": {
+        "overview": {
+          "title": "Articles",
+          "transformation": { "fields": ["published_on", "source", "market", "source_language", "headline", "url", "date_basis", "found_via"] },
+          "display": { "component": "table" }
+        }
+      }
+    }
+  }
+}
