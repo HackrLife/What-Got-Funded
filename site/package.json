@@ -1,0 +1,8 @@
+{
+  "name": "whatgotfunded-site",
+  "private": true,
+  "type": "module",
+  "description": "whatgotfunded.com: static site built from the wgf-publish feed. No dependencies.",
+  "scripts": { "build": "node build.mjs" },
+  "engines": { "node": ">=20" }
+}
