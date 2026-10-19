@@ -336,7 +336,7 @@ async function save(ids: number[], text: string) {
     if (repeat && status === "live") status = "stale";
     // round: same company, compatible stage, within 14 days
     let [rd] = await sql`select id from wgf.rounds
-                         where company_id = ${co.id}
+                         where company_id = ${co.id} and status <> 'superseded'
                            and (stage = ${stage} or stage = 'undisclosed' or ${stage} = 'undisclosed')
                            and abs(coalesce(announced_on, created_at::date) - ${announced}::date) <= 14
                          order by created_at desc limit 1`;

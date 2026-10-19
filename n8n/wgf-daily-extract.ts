@@ -148,6 +148,69 @@ const targets = node({
   },
 });
 
+// Companies the articles gave no website for: one Google search each (Apify Google Search Scraper, about $0.0025 a search)
+const findDomains = node({
+  type: 'n8n-nodes-base.httpRequest',
+  version: 4.4,
+  config: {
+    name: 'Find websites on Google',
+    onError: 'continueRegularOutput',
+    parameters: {
+      method: 'POST', url: 'https://api.apify.com/v2/acts/apify~google-search-scraper/run-sync-get-dataset-items?timeout=290&clean=true', ...apify,
+      sendBody: true, contentType: 'json', specifyBody: 'json',
+      jsonBody: expr('{{ JSON.stringify({ queries: ($json.need_domain || []).map(n => n.query).join("\\n"), maxPagesPerQuery: 1, saveHtmlToKeyValueStore: false, includeIcons: false }) }}'),
+      options: { timeout: 300000, response: { response: { responseFormat: 'json' } } },
+    },
+    credentials: apifyCred,
+  },
+});
+
+const matchDomains = node({
+  type: 'n8n-nodes-base.code',
+  version: 2,
+  config: {
+    name: 'Match search results',
+    parameters: {
+      mode: 'runOnceForAllItems',
+      jsCode: `const need = $('Companies to check').first().json.need_domain || [];
+const byQuery = {};
+for (const i of $input.all()) {
+  const q = i.json.searchQuery && i.json.searchQuery.term;
+  if (q) byQuery[q] = (i.json.organicResults || []).map(r => ({ url: r.url, title: r.title }));
+}
+return [{ json: { items: need.map(n => ({ id: n.id, name: n.name, results: byQuery[n.query] || [] })) } }];`,
+    },
+  },
+});
+
+const saveDomains = node({
+  type: 'n8n-nodes-base.httpRequest',
+  version: 4.4,
+  config: {
+    name: 'Save websites',
+    parameters: {
+      method: 'POST', url: FN, sendHeaders: true, headerParameters: headers,
+      sendBody: true, contentType: 'json', specifyBody: 'json',
+      jsonBody: expr('{{ JSON.stringify({ mode: "company_domains", items: $json.items }) }}'),
+      options: { timeout: 120000, ...lenient },
+    },
+  },
+});
+
+const recheck = node({
+  type: 'n8n-nodes-base.httpRequest',
+  version: 4.4,
+  config: {
+    name: 'Sites to read',
+    executeOnce: true,
+    parameters: {
+      method: 'POST', url: FN, sendHeaders: true, headerParameters: headers,
+      sendBody: true, contentType: 'json', specifyBody: 'json', jsonBody: '{ "mode": "company_targets", "days": 2 }',
+      options: { timeout: 60000, ...lenient },
+    },
+  },
+});
+
 const hasDomains = node({
   type: 'n8n-nodes-base.filter',
   version: 2.2,
@@ -213,6 +276,10 @@ export default workflow('wgf-daily-extract', 'WGF — Daily Extract (10pm)')
   .to(claude)
   .to(saveRounds)
   .to(targets)
+  .to(findDomains)
+  .to(matchDomains)
+  .to(saveDomains)
+  .to(recheck)
   .to(hasDomains)
   .to(readSites)
   .to(collectSites)
