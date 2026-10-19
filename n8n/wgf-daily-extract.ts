@@ -1,8 +1,7 @@
-import { workflow, node, trigger, expr, newCredential } from '@n8n/workflow-sdk';
+import { workflow, node, trigger, expr } from '@n8n/workflow-sdk';
 
-// What Got Funded — daily pipeline (Sydney time).
-// 9pm: start the Apify crawler (all mapped sources, previous UTC day).
-// 10pm: load the crawl, store articles in Supabase, extract each article with Claude Haiku (translation included),
+// What Got Funded — daily extraction, 10pm Sydney (the crawl starts at 9pm in wgf-daily-crawl.ts).
+// Loads the latest successful crawl, store articles in Supabase, extract each article with Claude Haiku (translation included),
 //       then read the new companies' own websites (crawler companies mode) for socials, founder links and careers pages.
 // The x-wgf-token value lives only in n8n; this export uses a placeholder.
 const FN = 'https://cxtcwslqzrzjaulqcvvu.supabase.co/functions/v1/wgf-extract';
@@ -13,43 +12,23 @@ const ACTOR = 'https://api.apify.com/v2/acts/HackrLife~wgf-crawler';
 const headers = { parameters: [{ name: 'x-wgf-token', value: TOKEN }] };
 const lenient = { response: { response: { neverError: true, responseFormat: 'json' } } };
 const apify = { authentication: 'genericCredentialType', genericAuthType: 'httpBearerAuth' };
-const apifyCred = { httpBearerAuth: newCredential('Apify API') };
+const apifyCred = { httpBearerAuth: { id: 'U4EQeOM0Nov43zUK', name: 'Apify API' } };
 
 const schedule = trigger({
   type: 'n8n-nodes-base.scheduleTrigger',
   version: 1.3,
-  config: { name: 'Daily 9pm Sydney', parameters: { rule: { interval: [{ field: 'cronExpression', expression: '0 0 21 * * *' }] } } },
+  config: { name: 'Daily 10pm Sydney', parameters: { rule: { interval: [{ field: 'cronExpression', expression: '0 0 22 * * *' }] } } },
 });
 const runNow = trigger({ type: 'n8n-nodes-base.manualTrigger', version: 1, config: { name: 'Run now' } });
-
-const startCrawl = node({
-  type: 'n8n-nodes-base.httpRequest',
-  version: 4.4,
-  config: {
-    name: 'Start crawl',
-    parameters: {
-      method: 'POST', url: `${ACTOR}/runs?memory=2048&timeout=3300`, ...apify,
-      sendBody: true, contentType: 'json', specifyBody: 'json', jsonBody: '{ "mode": "articles" }',
-      options: { timeout: 60000 },
-    },
-    credentials: apifyCred,
-  },
-});
-
-const waitHour = node({
-  type: 'n8n-nodes-base.wait',
-  version: 1.1,
-  config: { name: 'Wait until 10pm', parameters: { resume: 'timeInterval', amount: 60, unit: 'minutes' } },
-});
 
 const getArticles = node({
   type: 'n8n-nodes-base.httpRequest',
   version: 4.4,
   config: {
-    name: 'Load crawled articles',
+    name: 'Load latest crawl',
     parameters: {
       method: 'GET', ...apify,
-      url: expr(`https://api.apify.com/v2/datasets/{{ $('Start crawl').first().json.data.defaultDatasetId }}/items?clean=true&format=json&limit=2000`),
+      url: `${ACTOR}/runs/last/dataset/items?status=SUCCEEDED&clean=true&format=json&limit=3000`,
       options: { timeout: 120000, response: { response: { responseFormat: 'json' } } },
     },
     credentials: apifyCred,
@@ -223,10 +202,8 @@ const saveSites = node({
   },
 });
 
-export default workflow('wgf-daily-pipeline', 'WGF — Daily Crawl & Extract')
+export default workflow('wgf-daily-extract', 'WGF — Daily Extract (10pm)')
   .add(schedule)
-  .to(startCrawl)
-  .to(waitHour)
   .to(getArticles)
   .to(chunkArticles)
   .to(ingest)
@@ -241,4 +218,4 @@ export default workflow('wgf-daily-pipeline', 'WGF — Daily Crawl & Extract')
   .to(collectSites)
   .to(saveSites)
   .add(runNow)
-  .to(startCrawl);
+  .to(getArticles);
