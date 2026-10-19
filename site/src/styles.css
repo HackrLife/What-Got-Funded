@@ -279,7 +279,7 @@ aside .panel p { font-size: 15px; color: var(--muted); }
   .dayhead { flex-direction: column; align-items: start; }
   .dayhead h1 { font-size: 34px; }
   .bar a { padding: 0 6px; } .bar a span { display: none; }
-  .rounds .hide-s { display: none; }
+  .rounds .hide-s, .srct .hide-s { display: none; }
   .chead { grid-template-columns: 1fr; } .chead h1 { font-size: 44px; }
   .round .rest { grid-template-columns: 1fr; }
   .round .rest div { border-right: 0; border-bottom: 1px solid rgba(255,255,255,.25); padding: 20px 24px; }
@@ -291,3 +291,16 @@ aside .panel p { font-size: 15px; color: var(--muted); }
   .hb { grid-template-columns: 110px 1fr 64px; }
   .inv { grid-template-columns: 1fr; } .inv div:not(:nth-child(3n+1)) { padding-left: 0; }
 }
+
+/* About: source lists */
+.srcs { border-top: 1px solid var(--line); max-width: 860px; }
+.srcs:last-of-type { border-bottom: 1px solid var(--line); }
+.srcs summary { display: flex; justify-content: space-between; align-items: baseline; gap: 16px; padding: 14px 0; cursor: pointer; list-style: none; font-size: 17px; }
+.srcs summary::-webkit-details-marker { display: none; }
+.srcs summary span { color: var(--muted); font-size: 15px; }
+.srcs summary::after { content: "+"; font-weight: 700; margin-left: 12px; }
+.srcs[open] summary::after { content: "–"; }
+.srct { width: 100%; border-collapse: collapse; margin: 0 0 18px; font-size: 15px; }
+.srct th { text-align: left; font-weight: 600; color: var(--muted); padding: 6px 12px 6px 0; border-bottom: 1px solid var(--line); }
+.srct td { padding: 7px 12px 7px 0; border-bottom: 1px solid var(--line); vertical-align: top; }
+.srct td small { display: block; color: var(--muted); font-size: 13px; }

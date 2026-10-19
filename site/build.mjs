@@ -84,7 +84,7 @@ function amountCell(r) {
 // ---------- page shell ----------
 let CSS_HREF = "/assets/styles.css", JS_SRC = "/assets/app.js";
 function shell({ title, desc, active = "", body, canonical, scripts = "" }) {
-  const nav = [["/", "Today"], ["/analysis/", "Analysis"], ["/investors/", "Investors"], ["/jobs/", "Jobs"]]
+  const nav = [["/", "Today"], ["/analysis/", "Analysis"], ["/investors/", "Investors"], ["/jobs/", "Jobs"], ["/about/", "About"]]
     .map(([h, t]) => `<a href="${h}"${active === t ? ' class="on" aria-current="page"' : ""}>${t}</a>`).join("");
   return `<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
@@ -108,7 +108,7 @@ ${body}
 <footer class="foot">
   <div><b>What Got Funded</b><p>Daily startup funding intelligence from public sources. Every round links to where it was reported.</p></div>
   <div><b>Read</b><a href="/">Today</a><a href="/analysis/">Analysis</a><a href="/investors/">Investors</a><a href="/jobs/">Jobs</a></div>
-  <div><b>About</b><a href="/methodology/">Methodology</a><a href="/subscribe/">Subscribe</a><a href="mailto:dev@hackrlife.com?subject=Correction%20for%20What%20Got%20Funded">Request a correction</a></div>
+  <div><b>About</b><a href="/about/">About us and our sources</a><a href="/methodology/">Methodology</a><a href="/subscribe/">Subscribe</a><a href="mailto:dev@hackrlife.com?subject=Correction%20for%20What%20Got%20Funded">Request a correction</a></div>
 </footer>
 <script src="${JS_SRC}" defer></script>${scripts}
 </body></html>`;
@@ -398,17 +398,17 @@ function methodologyPage() {
 <h1>Methodology</h1>
 <p>How a funding announcement in a news source becomes a round on What Got Funded.</p>
 <h2>Sources</h2>
-<p>Every day at 5am Sydney time we collect funding news from ${SOURCES_LINE}: RSS feeds from startup and business publications, local-language news searches, and funding pages read directly where a publication has no feed. Pages are only read where the site's robots.txt allows it, and paywalled content is never collected.</p>
+<p>Every day we collect funding news from ${SOURCES_LINE}: RSS feeds from startup and business publications, local-language news searches, and funding pages read directly where a publication has no feed. Pages are only read where the site's robots.txt allows it, and paywalled content is never collected.</p>
 <h2>What counts as a round</h2>
 <p>Equity or venture rounds raised by startups and private growth companies: pre-seed, seed, angel, Series A onwards, growth equity, and strategic investments in startups.</p>
 <p>Excluded, with the reason recorded: debt and venture debt, grants and prizes, funds raised by investors, IPOs and raises by public companies, acquisitions and mergers, secondary share sales, private equity buyouts, and rounds that are only reported as talks or plans.</p>
 <h2>How each round is built</h2>
-<ul><li>Each headline is read by a language model instructed to use only what the source states. Values the source does not state stay empty and show as "not stated".</li>
+<ul><li>Each story is read by a language model instructed to use only what the source states. Values the source does not state stay empty and show as "not stated".</li>
 <li>The same round reported by several sources is merged into one record: same company, compatible stage, announced within 14 days.</li>
 <li>Amounts are converted to US dollars at the European Central Bank's daily reference rate. Totals count disclosed amounts only.</li>
 <li>Rounds announced more than 30 days before we first saw them, and reports that do not name the company, are kept out of the daily figures.</li></ul>
 <h2>Dates</h2>
-<p>A round belongs to the day it was announced, in the source's own date. Each daily edition covers the previous calendar day in Sydney time and is sent at 7am.</p>
+<p>A round belongs to the day it was announced, in the source's own date. Each daily edition covers the previous day.</p>
 <h2>Coverage</h2>
 <p>We measure coverage against commercial databases privately and use the gaps to add sources. Their data is never published here.</p>
 <h2>People</h2>
@@ -417,6 +417,72 @@ function methodologyPage() {
 <p>Every round links to where it was reported. If something is wrong, <a href="mailto:dev@hackrlife.com?subject=Correction%20for%20What%20Got%20Funded">send a correction</a> and it will be fixed in the next update.</p>
 </div>`;
   return shell({ title: "Methodology | What Got Funded", desc: "How What Got Funded collects, checks and publishes startup funding rounds every day.", body, canonical: "/methodology/" });
+}
+
+// ---------- about: sources come from the registry in /sources ----------
+function readCsv(file) {
+  const text = fs.readFileSync(file, "utf8"); const rows = []; let row = [], f = "", q = false;
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i];
+    if (q) { if (c === '"' && text[i + 1] === '"') { f += '"'; i++; } else if (c === '"') q = false; else f += c; continue; }
+    if (c === '"') q = true; else if (c === ",") { row.push(f); f = ""; }
+    else if (c === "\n" || c === "\r") { if (c === "\r" && text[i + 1] === "\n") i++; row.push(f); rows.push(row); row = []; f = ""; }
+    else f += c;
+  }
+  if (f || row.length) { row.push(f); rows.push(row); }
+  const [head, ...body] = rows.filter((r) => r.some((x) => x.trim()));
+  return body.map((r) => Object.fromEntries(head.map((h, i) => [h.trim(), (r[i] ?? "").trim()])));
+}
+
+function aboutPage() {
+  const file = path.join(ROOT, "..", "sources", "sources.csv");
+  const all = fs.existsSync(file) ? readCsv(file) : [];
+  const read = all.filter((s) => s.collection_method !== "manual_or_not_ingested" && s.homepage);
+  const searches = fs.existsSync(path.join(ROOT, "..", "sources", "google-news-queries.csv")) ? readCsv(path.join(ROOT, "..", "sources", "google-news-queries.csv")).length : 0;
+  const markets = new Set(read.map((s) => s.market)).size;
+  const langs = new Set(read.flatMap((s) => s.language.split("/").map((l) => l.trim())).filter(Boolean));
+  const ORDER = ["Global", "Americas", "Europe", "Africa", "Middle East", "APAC"];
+  const NAMES = { Global: "Global", Americas: "Americas", Europe: "Europe", Africa: "Africa", "Middle East": "Middle East", APAC: "Asia-Pacific" };
+  const host = (u) => { try { return new URL(u).hostname.replace(/^www\./, ""); } catch { return u; } };
+  const groups = ORDER.map((r) => [r, read.filter((s) => s.region === r).sort((a, b) => a.market.localeCompare(b.market) || a.source.localeCompare(b.source))]).filter(([, l]) => l.length);
+  const lists = groups.map(([r, l]) => `<details class="srcs"><summary><b>${NAMES[r] || r}</b><span>${plural(l.length, "source")}</span></summary>
+<table class="srct"><thead><tr><th>Source</th><th>Market</th><th class="hide-s">Language</th></tr></thead><tbody>
+${l.map((s) => `<tr><td><a class="u" href="${esc(s.homepage)}" rel="nofollow noopener" target="_blank">${esc(s.source)}</a><small>${esc(host(s.homepage))}</small></td><td>${esc(s.market)}</td><td class="hide-s">${esc(s.language)}</td></tr>`).join("\n")}
+</tbody></table></details>`).join("\n");
+
+  const body = `<div class="narrow prose">
+<h1>About What Got Funded</h1>
+<p class="lede">What Got Funded records the startup funding rounds announced around the world each day: who raised, how much, at what stage, from whom, and what the company does. Every entry links to the reports it came from.</p>
+
+<h2>Where the data comes from</h2>
+<p>We follow ${read.length} sources in ${markets} markets and ${langs.size} languages, listed in full below, plus ${searches} local-language news searches that pick up funding stories from outlets we do not follow directly. They include startup and technology publications, business newspapers, regional startup media, investor and accelerator news pages, and press-release wires.</p>
+<p>We read each source's public feed or funding section, only where the publisher's robots.txt allows it. We never collect paywalled content.</p>
+
+<h2>How we process it</h2>
+<ul>
+<li>Each funding story is read in full, whatever the language, and its details are recorded in English.</li>
+<li>From each story we take the company, what it does, where it is based, the amount and currency, the stage, the lead and other investors, and the founders, using only what the source states. Anything the source does not state is left blank.</li>
+<li>Amounts in other currencies are converted to US dollars at the European Central Bank's reference rate on the day.</li>
+<li>We then visit the company's own website for its official links: LinkedIn, X and its careers page.</li>
+</ul>
+
+<h2>How we curate it</h2>
+<ul>
+<li>The same round reported by several outlets becomes one entry, with every report listed as a source.</li>
+<li>We include equity rounds raised by startups and private growth companies: pre-seed, seed, Series A onwards, growth and strategic investments.</li>
+<li>We leave out debt, grants, funds raised by investors, IPOs, acquisitions, secondary sales, private equity buyouts, rumours and talks, old rounds reported again, and reports that do not name the company.</li>
+<li>Each round sits on the day it was announced.</li>
+</ul>
+
+<h2>What we may miss</h2>
+<p>We capture as much as our sources report, and we will still miss some rounds. Some are never announced publicly. Some appear only on social media or in a press release no outlet picks up. Some are reported only behind a paywall. Some details, such as the amount or the investors, are never disclosed and stay blank here. A round can also appear a day or two late when the first coverage comes from a source we read later.</p>
+<p>If you know of a round we missed or got wrong, <a href="mailto:dev@hackrlife.com?subject=Missing%20or%20wrong%20round%20on%20What%20Got%20Funded">tell us</a> and we will add or fix it.</p>
+
+<h2>Our sources</h2>
+<p>All ${read.length} sources we follow, by region.</p>
+${lists}
+</div>`;
+  return shell({ title: "About | What Got Funded", desc: `How What Got Funded sources, processes and curates startup funding rounds from ${read.length} sources in ${markets} markets.`, active: "About", body, canonical: "/about/" });
 }
 
 function subscribePage() {
@@ -488,11 +554,12 @@ async function main() {
   const monthFrom = addDays(homeDay, -29);
   write("investors/index.html", investorsPage(published.filter((r) => r.announced_on >= monthFrom), monthFrom, homeDay));
   write("jobs/index.html", jobsPage([...week].sort((a, b) => b.announced_on.localeCompare(a.announced_on) || (b.amount_usd || 0) - (a.amount_usd || 0))));
+  write("about/index.html", aboutPage());
   write("methodology/index.html", methodologyPage());
   write("subscribe/index.html", subscribePage());
   write("404.html", notFoundPage());
 
-  const urls = ["/", "/analysis/", "/investors/", "/jobs/", "/methodology/", "/subscribe/", ...days.map((d) => `/day/${d}/`), ...[...byCo.values()].map((rs) => rs[0].href)];
+  const urls = ["/", "/analysis/", "/investors/", "/jobs/", "/about/", "/methodology/", "/subscribe/", ...days.map((d) => `/day/${d}/`), ...[...byCo.values()].map((rs) => rs[0].href)];
   write("sitemap.xml", `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls.map((u) => `<url><loc>${SITE_URL}${u}</loc></url>`).join("\n")}\n</urlset>\n`);
   write("robots.txt", `User-agent: *\nAllow: /\nSitemap: ${SITE_URL}/sitemap.xml\n`);
 
