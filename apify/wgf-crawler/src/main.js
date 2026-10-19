@@ -93,7 +93,7 @@ async function crawlArticles(input) {
       if (p.filter !== "none" && !isFundingHeadline(l.title)) continue;
       const d = urlDate(l.url);
       if (d && d < addDays(target, -1)) continue;                     // URL says it is older than the target day
-      addCandidate({ url: l.url, title: l.title, feed_date: null, summary: "", source: p.source, found_via: "page", market: p.market, region: null, source_language: null });
+      addCandidate({ url: l.url, title: l.title, feed_date: null, summary: "", source: p.source, found_via: "page", filtered: p.filter !== "none", market: p.market, region: null, source_language: null });
       if (++kept >= 60) break;
     }
     health.push({ source: p.source, kind: "page", url: p.page_url, ok: true, items: links.length, kept });
@@ -113,7 +113,7 @@ async function crawlArticles(input) {
   list = list.filter((c) => !c.unresolved && !seen.has(c.url) && seen.add(c.url));
 
   // 4. fetch and parse each article
-  let saved = 0, skippedDate = 0, failed = 0, blocked = 0;
+  let saved = 0, skippedDate = 0, failed = 0, blocked = 0, notFunding = 0;
   await pool(list, concurrency, async (c) => {
     if (!(await allowed(c.url))) { blocked++; return; }
     const r = await politely(c.url, () => get(c.url, { browserUa: true }));
@@ -123,6 +123,8 @@ async function crawlArticles(input) {
     const published_on = a.published_on || (c.found_via === "rss" && c.feed_date ? c.feed_date.slice(0, 10) : null);
     const date_basis = a.published_on ? a.date_basis : published_on ? "feed" : null;
     if (published_on && !keepDays.has(published_on)) { skippedDate++; return; }
+    // Unfiltered pages (homepages, general sections): keep only articles whose headline or opening reads as a raise
+    if (c.found_via === "page" && !c.filtered && !isFundingHeadline(`${a.title || c.title} ${a.text.slice(0, 400)}`)) { notFunding++; return; }
     await pushData({
       target_date: target,
       url: a.canonical && /^https?:/.test(a.canonical) ? a.canonical : r.url || c.url,
@@ -139,7 +141,7 @@ async function crawlArticles(input) {
     if (++saved % 50 === 0) log(`${saved} articles saved`);
   });
 
-  const summary = { target_date: target, feeds: feeds.length, pages: pages.length, candidates: candidates.size, articles_saved: saved, skipped_other_dates: skippedDate, fetch_failed: failed, robots_blocked: blocked };
+  const summary = { target_date: target, feeds: feeds.length, pages: pages.length, candidates: candidates.size, articles_saved: saved, skipped_other_dates: skippedDate, skipped_not_funding: notFunding, fetch_failed: failed, robots_blocked: blocked };
   log(JSON.stringify(summary));
   await setValue("SUMMARY", summary);
   await setValue("SOURCE_HEALTH", health);
