@@ -456,7 +456,8 @@ ${l.map((s) => `<tr><td><a class="u" href="${esc(s.homepage)}" rel="nofollow noo
 
   const body = `<div class="narrow prose">
 <h1>About What Got Funded</h1>
-<p class="lede">What Got Funded records the startup funding rounds announced around the world each day: who raised, how much, at what stage, from whom, and what the company does. Every entry links to the reports it came from.</p>
+<p class="lede">What Got Funded curates startup funding news and analyses it. We collect funding rounds reported by news sources around the world, record each one in the same format, and analyse where the money is going by region, market, sector, stage and investor.</p>
+<p>We are not a private database and we do not run our own investigations. Every round on this site was reported publicly by a news source, and every entry links to the reports it came from.</p>
 
 <h2>Where the data comes from</h2>
 <p>We follow ${read.length} sources in ${markets} markets and ${langs.size} languages, listed in full below, plus ${searches} local-language news searches that pick up funding stories from outlets we do not follow directly. They include startup and technology publications, business newspapers, regional startup media, investor and accelerator news pages, and press-release wires.</p>
@@ -467,7 +468,7 @@ ${l.map((s) => `<tr><td><a class="u" href="${esc(s.homepage)}" rel="nofollow noo
 <li>Each funding story is read in full, whatever the language, and its details are recorded in English.</li>
 <li>From each story we take the company, what it does, where it is based, the amount and currency, the stage, the lead and other investors, and the founders, using only what the source states. Anything the source does not state is left blank.</li>
 <li>Amounts in other currencies are converted to US dollars at the European Central Bank's reference rate on the day.</li>
-<li>We then visit the company's own website for its official links: LinkedIn, X and its careers page.</li>
+<li>We add the company's official links (website, LinkedIn, X and careers page) so readers can find the company. The funding details themselves come only from the news reports.</li>
 </ul>
 
 <h2>How we curate it</h2>
@@ -478,8 +479,11 @@ ${l.map((s) => `<tr><td><a class="u" href="${esc(s.homepage)}" rel="nofollow noo
 <li>Each round sits on the day it was announced.</li>
 </ul>
 
+<h2>How we analyse it</h2>
+<p>Once the day's rounds are curated, we analyse them: the total raised, the split by continent and market, the sectors and stages attracting money, the largest rounds and the most active investors. The daily edition covers each day's rounds; the weekly, monthly and longer analyses look at how funding is shifting over time.</p>
+
 <h2>What we may miss</h2>
-<p>We capture as much as our sources report, and we will still miss some rounds. Some are never announced publicly. Some appear only on social media or in a press release no outlet picks up. Some are reported only behind a paywall. Some details, such as the amount or the investors, are never disclosed and stay blank here. A round can also appear a day or two late when the first coverage comes from a source we read later.</p>
+<p>Because we curate from news sources, our coverage is only as complete as the news. We capture as much as our sources report, and we will still miss some rounds. Some are never announced publicly. Some appear only on social media or in a press release no outlet picks up. Some are reported only behind a paywall. Some details, such as the amount or the investors, are never disclosed and stay blank here. A round can also appear a day or two late when the first coverage comes from a source we read later.</p>
 <p>If you know of a round we missed or got wrong, <a href="mailto:dev@hackrlife.com?subject=Missing%20or%20wrong%20round%20on%20What%20Got%20Funded">tell us</a> and we will add or fix it.</p>
 
 <h2>Our sources</h2>
@@ -488,7 +492,7 @@ ${l.map((s) => `<tr><td><a class="u" href="${esc(s.homepage)}" rel="nofollow noo
 <div class="regcards">
 ${cards}
 </div>`;
-  return shell({ title: "About | What Got Funded", desc: `How What Got Funded sources, processes and curates startup funding rounds from ${read.length} sources in ${markets} markets.`, active: "About", body, canonical: "/about/" });
+  return shell({ title: "About | What Got Funded", desc: `What Got Funded curates startup funding news from ${read.length} sources in ${markets} markets and analyses where the money is going.`, active: "About", body, canonical: "/about/" });
 }
 
 function subscribePage() {
