@@ -22,7 +22,7 @@
       "title": "Target day (YYYY-MM-DD)",
       "type": "string",
       "editor": "textfield",
-      "description": "Day the rounds were announced. Leave empty for the previous UTC day."
+      "description": "Day the rounds were announced. Leave empty for the day before today in Sydney (a 9pm Sydney run on the 10th collects the 9th)."
     },
     "sourcesRepo": {
       "title": "Sources folder URL",

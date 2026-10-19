@@ -2,7 +2,7 @@
 //
 // mode "articles" (default, 9pm Sydney): read every mapped source, keep funding headlines, fetch each article
 //   and output one dataset item per article with full text, publish date, outbound links and social links.
-//   targetDate defaults to the previous UTC day, so a 9pm Sydney run (10:00 UTC) collects the day that just
+//   targetDate defaults to the day before today in Sydney: a 9pm Sydney run on the 10th collects the 9th, the day that just
 //   ended worldwide. Articles published on the target day or the day after (late local coverage) are kept.
 // mode "companies" (after extraction): for each company domain, read the homepage and about/team pages and output
 //   company social profiles, people profile links and the careers page.
@@ -48,7 +48,9 @@ async function politely(url, fn, perHost = 2) {
 
 // ---------- mode: articles ----------
 async function crawlArticles(input) {
-  const target = input.targetDate || addDays(new Date().toISOString().slice(0, 10), -1);
+  // The day before today in Sydney. A run at 9pm Sydney on the 10th collects the 9th, which has ended everywhere by then.
+  const sydneyToday = new Intl.DateTimeFormat("en-CA", { timeZone: "Australia/Sydney" }).format(new Date());
+  const target = input.targetDate || addDays(sydneyToday, -1);
   const keepDays = new Set([target, addDays(target, 1)]);
   const windowStart = Date.parse(addDays(target, -1) + "T10:00:00Z");   // UTC+14 start of the target day, minus slack
   const repo = input.sourcesRepo || DEFAULT_REPO;

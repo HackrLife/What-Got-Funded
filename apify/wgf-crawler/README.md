@@ -36,7 +36,7 @@ It stores links only. It never scrapes LinkedIn or X themselves, and it never co
 | field | default | |
 |---|---|---|
 | mode | articles | `articles` or `companies` |
-| targetDate | previous UTC day | day the rounds were announced |
+| targetDate | day before today in Sydney | day the rounds were announced |
 | sourcesRepo | this repo's `sources/` raw URL | where the CSVs live |
 | domains | — | companies mode |
 | maxArticles | 800 | |
