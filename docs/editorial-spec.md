@@ -55,3 +55,19 @@ One **Insights** page with segment tabs: Countries, Investors, Industries, Fundi
 - Use only what sources state; unstated values stay blank.
 - Amounts in US dollars (ECB reference rate), with the original currency shown where different.
 - Founders: name, role and public profile links only. Never emails or phone numbers.
+
+## Every daily run: checklist
+
+1. **Data check before publishing** (the day's `live` rounds):
+   - Drop recaps: a round whose sources are a roundup article ("AI startups secured $16B…") or whose source URL is dated to an earlier month is not the day's news. Set it `stale` (never delete).
+   - Every round needs a country; fill it from the source when the article states it.
+   - No vague "what it does" lines ("not described in the headline"); the edition hides them, fix the company description when the source says more.
+   - Investor and founder names: one entry per firm or person. Translation variants go in `site/data/editions.json` under that day's `rounds` until fixed in the data.
+2. **Headline**: auto-picked by `site/src/edition.mjs` (largest round, or a sector/investor story when one dominates). Override in `site/data/editions.json` → `{ "YYYY-MM-DD": { "headline": "...", "dek": "..." } }`.
+3. **Site**: push to `main`; Vercel rebuilds. The edition appears at `/editions/YYYY-MM-DD/`, as the card on the home page and in `/editions/`.
+4. **Newsletter**:
+   - `cd site && node newsletter.mjs YYYY-MM-DD && python3 render-charts.py YYYY-MM-DD`, commit the PNGs, push.
+   - Upload the four PNGs to Beehiiv (`save_image` from the raw GitHub URL at the commit SHA).
+   - `save_post` as a **draft** with the edition headline as title and subject, `hide_from_feed: true`, email recipients = segment `seg_36f8c7f8-5c39-472a-a78e-61f7852370ca` ("What Got Funded — first readers") until the full list is opened.
+   - At most 20 startups; every region with rounds keeps at least one slot; ends with "See all N rounds" to the article.
+5. Sending stays a human action in Beehiiv.
