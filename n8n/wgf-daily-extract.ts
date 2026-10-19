@@ -148,18 +148,40 @@ const targets = node({
   },
 });
 
-// Companies the articles gave no website for: one Google search each (Apify Google Search Scraper, about $0.0025 a search)
+// Companies the articles gave no website for: one Google search each (Apify Google Search Scraper, about $0.0025 a search).
+// Started in the background, then read after a wait, because a few hundred searches take longer than a synchronous call allows.
 const findDomains = node({
   type: 'n8n-nodes-base.httpRequest',
   version: 4.4,
   config: {
-    name: 'Find websites on Google',
+    name: 'Start website search',
     onError: 'continueRegularOutput',
     parameters: {
-      method: 'POST', url: 'https://api.apify.com/v2/acts/apify~google-search-scraper/run-sync-get-dataset-items?timeout=290&clean=true', ...apify,
+      method: 'POST', url: 'https://api.apify.com/v2/acts/apify~google-search-scraper/runs?timeout=1200', ...apify,
       sendBody: true, contentType: 'json', specifyBody: 'json',
-      jsonBody: expr('{{ JSON.stringify({ queries: ($json.need_domain || []).map(n => n.query).join("\\n"), maxPagesPerQuery: 1, saveHtmlToKeyValueStore: false, includeIcons: false }) }}'),
-      options: { timeout: 300000, response: { response: { responseFormat: 'json' } } },
+      jsonBody: expr('{{ JSON.stringify({ queries: ($json.need_domain || []).map(n => n.query).join("\\n") || "What Got Funded", maxPagesPerQuery: 1, saveHtmlToKeyValueStore: false, includeIcons: false }) }}'),
+      options: { timeout: 60000, response: { response: { responseFormat: 'json' } } },
+    },
+    credentials: apifyCred,
+  },
+});
+
+const waitSearch = node({
+  type: 'n8n-nodes-base.wait',
+  version: 1.1,
+  config: { name: 'Wait for search', parameters: { resume: 'timeInterval', amount: 8, unit: 'minutes' } },
+});
+
+const getSearch = node({
+  type: 'n8n-nodes-base.httpRequest',
+  version: 4.4,
+  config: {
+    name: 'Load search results',
+    onError: 'continueRegularOutput',
+    parameters: {
+      method: 'GET', ...apify,
+      url: expr("https://api.apify.com/v2/datasets/{{ $('Start website search').first().json.data.defaultDatasetId }}/items?clean=true&format=json"),
+      options: { timeout: 120000, response: { response: { responseFormat: 'json' } } },
     },
     credentials: apifyCred,
   },
@@ -188,6 +210,7 @@ const saveDomains = node({
   version: 4.4,
   config: {
     name: 'Save websites',
+    onError: 'continueRegularOutput',
     parameters: {
       method: 'POST', url: FN, sendHeaders: true, headerParameters: headers,
       sendBody: true, contentType: 'json', specifyBody: 'json',
@@ -277,6 +300,8 @@ export default workflow('wgf-daily-extract', 'WGF — Daily Extract (10pm)')
   .to(saveRounds)
   .to(targets)
   .to(findDomains)
+  .to(waitSearch)
+  .to(getSearch)
   .to(matchDomains)
   .to(saveDomains)
   .to(recheck)

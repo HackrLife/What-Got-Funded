@@ -118,10 +118,11 @@ Rules:
 - hq_city, hq_country: the company's base, in English, if stated or clear (e.g. "Bengaluru-based").
 - description: one plain sentence on what the company does. unique: one sentence on what is distinctive about the company or this round, only if the article supports it, else null. summary: two or three sentences for a newsletter entry covering what the company does, the round and what the money is for, using only facts in the article.
 - use_of_funds: what the money is for, if stated, else null.
-- announced_on: YYYY-MM-DD of the announcement only if the article states it, else null.
+- announced_on: YYYY-MM-DD of the day the round was announced. Resolve relative wording against the publish date ("today" = publish date, "yesterday" = the day before, "on Tuesday" = the most recent Tuesday on or before the publish date). If the article reports the raise as fresh news with no other date, use the publish date. If it is clearly a follow-up to an announcement made on an earlier unstated day ("last week", "recently", "earlier this month"), use null and set fresh to false.
+- fresh: true if this article is reporting the announcement itself (published on the day of the announcement or the day after), false if it covers a round announced earlier.
 
 Reply with JSON only:
-{"rounds":[{"item_ids":[${Number(item.id)}],"company":"","company_native":null,"domain":null,"company_socials":{"linkedin":null,"x":null},"hq_city":null,"hq_country":null,"sector":"","stage":"","amount":null,"currency":null,"amount_usd_stated":null,"amount_text":null,"lead_investors":[],"investors":[],"founders":[{"name":"","role":"","linkedin":null,"x":null}],"description":"","unique":null,"use_of_funds":null,"summary":"","announced_on":null}],"excluded":[{"id":${Number(item.id)},"reason":"not_funding"}]}`;
+{"rounds":[{"item_ids":[${Number(item.id)}],"company":"","company_native":null,"domain":null,"company_socials":{"linkedin":null,"x":null},"hq_city":null,"hq_country":null,"sector":"","stage":"","amount":null,"currency":null,"amount_usd_stated":null,"amount_text":null,"lead_investors":[],"investors":[],"founders":[{"name":"","role":"","linkedin":null,"x":null}],"description":"","unique":null,"use_of_funds":null,"summary":"","announced_on":null,"fresh":true}],"excluded":[{"id":${Number(item.id)},"reason":"not_funding"}]}`;
   const links = [
     ...((meta.outbound as { domain: string; anchor: string }[]) ?? []).map((o) => `${o.domain} — "${o.anchor}"`),
     ...((meta.socials as string[]) ?? []),
@@ -173,9 +174,13 @@ async function companyTargets(body: Record<string, unknown>) {
                          where c.domain is not null and c.site_checked_at is null and r.status = 'live'
                            and r.created_at > now() - make_interval(days => ${days})`;
   // Companies with no website yet: searched once on Google (Apify) to find it
-  const missing = await sql`select distinct c.id, c.name, c.hq_country from wgf.companies c join wgf.rounds r on r.company_id = c.id
+  // Only today's work: rounds the article extraction created in the last day, newest first
+  const missing = await sql`select c.id, c.name, c.hq_country, max(r.created_at) as seen from wgf.companies c join wgf.rounds r on r.company_id = c.id
                             where c.domain is null and c.domain_checked_at is null and r.status = 'live'
-                              and r.created_at > now() - make_interval(days => ${days}) limit 300`;
+                              and r.created_at > now() - interval '1 day'
+                              and exists (select 1 from wgf.round_profiles rp where rp.round_id = r.id and rp.method = 'pipeline')
+                              and c.name !~* '(unnamed|undisclosed|stealth)'
+                            group by c.id, c.name, c.hq_country order by seen desc limit 150`;
   return {
     domains: rows.map((r) => r.domain),
     need_domain: missing.map((m) => ({ id: Number(m.id), name: m.name, query: `${m.name} ${m.hq_country ?? ""} startup official website`.replace(/\s+/g, " ").trim() })),
@@ -191,6 +196,7 @@ async function companyDomains(body: Record<string, unknown>) {
   const items = (Array.isArray(body.items) ? body.items : []) as { id: number; name: string; results: { url: string; title?: string }[] }[];
   let found = 0;
   for (const it of items) {
+    if (!it.results?.length) continue;   // search failed or empty: try again next run
     const want = tokens(String(it.name ?? ""));
     let pick: string | null = null;
     for (const r of (it.results ?? []).slice(0, 6)) {
@@ -258,6 +264,13 @@ function parseReply(text: string): { rounds: Record<string, unknown>[]; excluded
 const str = (v: unknown, max = 500) => (typeof v === "string" && v.trim() ? v.trim().slice(0, max) : null);
 const num = (v: unknown) => (typeof v === "number" && isFinite(v) && v > 0 ? v : typeof v === "string" && /^\d+(\.\d+)?$/.test(v) ? Number(v) : null);
 const names = (v: unknown) => (Array.isArray(v) ? [...new Set(v.map((x) => str(typeof x === "string" ? x : (x as { name?: string })?.name, 200)).filter(Boolean) as string[])] : []);
+const COUNTRY_ALIAS: Record<string, string> = {
+  "uae": "United Arab Emirates", "u.a.e.": "United Arab Emirates", "usa": "United States", "us": "United States", "u.s.": "United States",
+  "united states of america": "United States", "uk": "United Kingdom", "u.k.": "United Kingdom", "great britain": "United Kingdom", "england": "United Kingdom",
+  "ksa": "Saudi Arabia", "kingdom of saudi arabia": "Saudi Arabia", "korea": "South Korea", "republic of korea": "South Korea",
+  "prc": "China", "mainland china": "China", "hong kong sar": "Hong Kong", "türkiye": "Turkey", "czechia": "Czech Republic", "the netherlands": "Netherlands", "holland": "Netherlands",
+};
+const normCountry = (c: string | null) => (c ? COUNTRY_ALIAS[c.toLowerCase()] ?? c : null);
 const cleanDomain = (v: unknown) => {
   const s = str(v, 200);
   if (!s) return null;
@@ -280,7 +293,7 @@ async function save(ids: number[], text: string) {
     if (!itemIds.length || !company) continue;
     const native = str(r.company_native, 200);
     const domain = cleanDomain(r.domain);
-    const country = str(r.hq_country, 80);
+    const country = normCountry(str(r.hq_country, 80));
     const stage = STAGES.includes(String(r.stage)) ? String(r.stage) : "undisclosed";
     const sector = SECTORS.includes(String(r.sector)) ? String(r.sector) : "Other";
     const currency = str(r.currency, 3)?.toUpperCase() ?? null;
@@ -288,6 +301,7 @@ async function save(ids: number[], text: string) {
     const amountUsd = num(r.amount_usd_stated) ?? (amount && currency && fx[currency] ? Math.round(amount / fx[currency]) : null);
     const firstPub = itemIds.map((i) => byId.get(i)!.published_at).filter(Boolean).sort()[0] ?? new Date().toISOString();
     const announced = /^\d{4}-\d{2}-\d{2}$/.test(String(r.announced_on)) ? String(r.announced_on) : String(new Date(firstPub).toISOString()).slice(0, 10);
+    const notFresh = r.fresh === false && !/^\d{4}-\d{2}-\d{2}$/.test(String(r.announced_on));
 
     let status = UNNAMED_COMPANY.test(company) ? "unnamed"
       : Date.parse(announced) < Date.parse(String(new Date(firstPub).toISOString()).slice(0, 10)) - 30 * 864e5 ? "stale" : "live";
@@ -334,6 +348,8 @@ async function save(ids: number[], text: string) {
     }
 
     if (repeat && status === "live") status = "stale";
+    // Announced on an earlier, unstated day: kept for the record but not counted on the article's day
+    if (notFresh && status === "live") status = "unverified";
     // round: same company, compatible stage, within 14 days
     let [rd] = await sql`select id from wgf.rounds
                          where company_id = ${co.id} and status <> 'superseded'
