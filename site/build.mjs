@@ -441,14 +441,18 @@ function aboutPage() {
   const searches = fs.existsSync(path.join(ROOT, "..", "sources", "google-news-queries.csv")) ? readCsv(path.join(ROOT, "..", "sources", "google-news-queries.csv")).length : 0;
   const markets = new Set(read.map((s) => s.market)).size;
   const langs = new Set(read.flatMap((s) => s.language.split("/").map((l) => l.trim())).filter(Boolean));
-  const ORDER = ["Global", "Americas", "Europe", "Africa", "Middle East", "APAC"];
   const NAMES = { Global: "Global", Americas: "Americas", Europe: "Europe", Africa: "Africa", "Middle East": "Middle East", APAC: "Asia-Pacific" };
   const host = (u) => { try { return new URL(u).hostname.replace(/^www\./, ""); } catch { return u; } };
-  const groups = ORDER.map((r) => [r, read.filter((s) => s.region === r).sort((a, b) => a.market.localeCompare(b.market) || a.source.localeCompare(b.source))]).filter(([, l]) => l.length);
-  const lists = groups.map(([r, l]) => `<details class="srcs"><summary><b>${NAMES[r] || r}</b><span>${plural(l.length, "source")}</span></summary>
+  const ORDER2 = ["Americas", "Europe", "Africa", "Middle East", "APAC", "Global"];
+  const cards = ORDER2.map((r) => [r, read.filter((s) => s.region === r).sort((a, b) => a.market.localeCompare(b.market) || a.source.localeCompare(b.source))])
+    .filter(([, l]) => l.length).map(([r, l]) => {
+      const mk = new Set(l.map((s) => s.market)).size;
+      const lg = new Set(l.flatMap((s) => s.language.split("/").map((x) => x.trim())).filter(Boolean)).size;
+      return `<details class="regcard"><summary><span class="rname">${NAMES[r] || r}</span><span class="rnum" aria-label="${plural(l.length, "source")}">${l.length}<small>sources</small></span><span class="rmeta">${plural(mk, "market")} · ${plural(lg, "language")}</span><span class="rhint">See all sources</span></summary>
 <table class="srct"><thead><tr><th>Source</th><th>Market</th><th class="hide-s">Language</th></tr></thead><tbody>
 ${l.map((s) => `<tr><td><a class="u" href="${esc(s.homepage)}" rel="nofollow noopener" target="_blank">${esc(s.source)}</a><small>${esc(host(s.homepage))}</small></td><td>${esc(s.market)}</td><td class="hide-s">${esc(s.language)}</td></tr>`).join("\n")}
-</tbody></table></details>`).join("\n");
+</tbody></table></details>`;
+    }).join("\n");
 
   const body = `<div class="narrow prose">
 <h1>About What Got Funded</h1>
@@ -479,8 +483,10 @@ ${l.map((s) => `<tr><td><a class="u" href="${esc(s.homepage)}" rel="nofollow noo
 <p>If you know of a round we missed or got wrong, <a href="mailto:dev@hackrlife.com?subject=Missing%20or%20wrong%20round%20on%20What%20Got%20Funded">tell us</a> and we will add or fix it.</p>
 
 <h2>Our sources</h2>
-<p>All ${read.length} sources we follow, by region.</p>
-${lists}
+<p>Open a region to see every source we follow there.</p>
+</div>
+<div class="regcards">
+${cards}
 </div>`;
   return shell({ title: "About | What Got Funded", desc: `How What Got Funded sources, processes and curates startup funding rounds from ${read.length} sources in ${markets} markets.`, active: "About", body, canonical: "/about/" });
 }

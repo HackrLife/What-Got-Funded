@@ -292,15 +292,25 @@ aside .panel p { font-size: 15px; color: var(--muted); }
   .inv { grid-template-columns: 1fr; } .inv div:not(:nth-child(3n+1)) { padding-left: 0; }
 }
 
-/* About: source lists */
-.srcs { border-top: 1px solid var(--line); max-width: 860px; }
-.srcs:last-of-type { border-bottom: 1px solid var(--line); }
-.srcs summary { display: flex; justify-content: space-between; align-items: baseline; gap: 16px; padding: 14px 0; cursor: pointer; list-style: none; font-size: 17px; }
-.srcs summary::-webkit-details-marker { display: none; }
-.srcs summary span { color: var(--muted); font-size: 15px; }
-.srcs summary::after { content: "+"; font-weight: 700; margin-left: 12px; }
-.srcs[open] summary::after { content: "–"; }
-.srct { width: 100%; border-collapse: collapse; margin: 0 0 18px; font-size: 15px; }
+/* About: one expandable card per region; an open card spans the full row and lists its sources */
+.regcards { display: grid; grid-auto-flow: dense; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; padding: 24px var(--gut) 8px; max-width: 1180px; }
+.regcard { border: 1px solid var(--line); border-radius: 12px; background: #fff; transition: box-shadow .15s; }
+.regcard:hover { box-shadow: 0 2px 10px rgba(16, 24, 40, .08); }
+.regcard[open] { grid-column: 1 / -1; }
+.regcard summary { display: grid; grid-template-columns: 1fr auto; grid-template-areas: "name num" "meta meta" "hint hint"; row-gap: 6px; padding: 20px 22px; cursor: pointer; list-style: none; }
+.regcard summary::-webkit-details-marker { display: none; }
+.regcard .rname { grid-area: name; font-size: 22px; font-weight: 700; letter-spacing: -.01em; }
+.regcard .rnum { grid-area: num; font-size: 34px; font-weight: 800; line-height: 1; font-variant-numeric: tabular-nums; }
+.regcard .rmeta { grid-area: meta; color: var(--muted); font-size: 15px; }
+.regcard .rhint { grid-area: hint; margin-top: 10px; font-size: 14px; font-weight: 600; }
+.regcard .rhint::after { content: " +"; }
+.regcard[open] .rhint { font-size: 0; }
+.regcard[open] .rhint::after { content: "Close –"; font-size: 14px; }
+.regcard .srct { width: calc(100% - 44px); margin: 0 22px 20px; }
+.srct { border-collapse: collapse; font-size: 15px; }
 .srct th { text-align: left; font-weight: 600; color: var(--muted); padding: 6px 12px 6px 0; border-bottom: 1px solid var(--line); }
 .srct td { padding: 7px 12px 7px 0; border-bottom: 1px solid var(--line); vertical-align: top; }
 .srct td small { display: block; color: var(--muted); font-size: 13px; }
+@media (max-width: 860px) { .regcards { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 560px) { .regcards { grid-template-columns: 1fr; } .regcard .srct { width: calc(100% - 32px); margin: 0 16px 16px; } .regcard summary { padding: 18px 16px; } }
+.regcard .rnum small { display: block; font-size: 12px; font-weight: 600; color: var(--muted); text-align: right; margin-top: 4px; letter-spacing: .02em; }
