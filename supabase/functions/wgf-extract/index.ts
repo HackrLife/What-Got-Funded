@@ -35,8 +35,9 @@ const SECTORS = [
   "Consumer & retail", "Food & agriculture", "Real estate & construction", "Logistics & supply chain", "Education", "HR & work",
   "Media & entertainment", "Gaming", "Travel & hospitality", "Web3 & crypto", "Other",
 ];
-const EXCLUDE_REASONS = ["not_funding", "debt", "grant", "fund_close", "ipo_or_public", "m_and_a", "secondary", "private_equity", "duplicate_listing", "rumour", "other"];
+const EXCLUDE_REASONS = ["not_funding", "debt", "grant", "fund_close", "ipo_or_public", "m_and_a", "secondary", "private_equity", "duplicate_listing", "rumour", "recap", "other"];
 // Company names that are descriptions, not names ("an undisclosed AI startup")
+const NON_LATIN = /[\u3040-\u30ff\u3400-\u9fff\uac00-\ud7af\u0600-\u06ff\u0400-\u04ff\u0590-\u05ff\u0e00-\u0e7f]/;
 const UNNAMED_COMPANY = /^(an? |the )?(undisclosed|unnamed|unidentified|stealth|anonymous)\b/i;
 // Placeholders that are not investor names
 const GENERIC_INVESTOR = /^(existing|new|other|undisclosed|unnamed|several|various|private|individual|angel|strategic|institutional|international|local|family)?\s*(investors?|backers?|angels?|shareholders?|funds?|vcs?|venture capital( firms?)?|family offices?|investment firms?)$|^(others?|undisclosed|n\/a)$/i;
@@ -96,23 +97,28 @@ function buildArticlePrompt(item: Record<string, unknown>) {
   const system = `You read one full news article, in any language, and extract the startup funding rounds it reports as JSON, in English. You are precise and never guess.
 
 Include only equity or venture rounds raised by startups or private growth companies: pre-seed, seed, angel, Series A onwards, growth equity, and strategic or corporate investments in startups.
-If the article reports no such round, return it in excluded with one reason: not_funding, debt, grant, fund_close, ipo_or_public, m_and_a, secondary, private_equity, duplicate_listing, rumour (talks, "in discussions", "plans to raise", "reportedly" without a confirmed close), other.
+If the article reports no such round, return it in excluded with one reason: not_funding, debt, grant, fund_close, ipo_or_public, m_and_a, secondary, private_equity, duplicate_listing, rumour (talks, "in discussions", "plans to raise", "reportedly" without a confirmed close), recap, other.
+
+Only new announcements count:
+- Extract a round only if the article reports it as recent news: announced on or within 7 days before the article's publish date.
+- Do not extract rounds the article mentions as background or history ("raised in May", "last year", "earlier this month"), or rounds listed in periodic reports, rankings and data recaps (quarterly or monthly funding totals, "largest rounds of Q3", CB Insights or Crunchbase tallies). If nothing new remains, put the article in excluded with reason "recap".
+- A weekly or daily deals roundup is fine: extract each deal it presents as just announced.
 
 Rules:
 - Use only what the article states, plus the links listed under "Links in the article". Never invent a domain, social profile, founder, investor, amount or date. Unstated values are null or [].
 - One round per company. A roundup article may report several rounds; extract each.
-- Translate everything into English. company is the English or romanised name; company_native is the original-script name if different, else null.
+- Translate everything into English. company must be in Latin script: the company's English name if the article or its links give one, otherwise a romanisation (pinyin for Chinese, Hepburn for Japanese, Revised Romanization for Korean). company_native is the original-script name if different, else null.
 - domain: the company's own website, only if the article names it or a link in the article clearly points to it (match by name). Not the publisher, an investor or a social network.
 - company_socials and founders' linkedin/x: only URLs from "Links in the article" that clearly belong to that company or person; else null.
 - amount: a number in full units of the stated currency (16.25亿元 → 1625000000 CNY; 30億円 → 3000000000 JPY; 50억원 → 5000000000 KRW; Rs 36.5 crore → 365000000 INR). For bounds ("more than $500M") set the figure and copy the wording to amount_text. For vague sizes (数千万元, "eight figures") amount is null and the wording goes to amount_text.
 - amount_usd_stated: the USD figure only if the article itself gives one.
-- lead_investors and investors: named firms or people only, in English. Never placeholders such as "existing investors".
+- lead_investors and investors: named firms or people only, each listed once under its English name (no original-script duplicates, no repeated variants such as "Dragoneer" and "Dragoneer Investment Group"). Never placeholders such as "existing investors". Leads go only in lead_investors.
 - stage: one of ${STAGES.join(", ")}. Angel counts as seed; Pre-A and A+ as series_a; B+ as series_b; undisclosed if not stated.
 - sector: one of ${SECTORS.map((s) => `"${s}"`).join(", ")}.
 - hq_city, hq_country: the company's base, in English, if stated or clear (e.g. "Bengaluru-based").
 - description: one plain sentence on what the company does. unique: one sentence on what is distinctive about the company or this round, only if the article supports it, else null. summary: two or three sentences for a newsletter entry covering what the company does, the round and what the money is for, using only facts in the article.
 - use_of_funds: what the money is for, if stated, else null.
-- announced_on: YYYY-MM-DD of the announcement if the article dates it, else the article's publish date.
+- announced_on: YYYY-MM-DD of the announcement only if the article states it, else null.
 
 Reply with JSON only:
 {"rounds":[{"item_ids":[${Number(item.id)}],"company":"","company_native":null,"domain":null,"company_socials":{"linkedin":null,"x":null},"hq_city":null,"hq_country":null,"sector":"","stage":"","amount":null,"currency":null,"amount_usd_stated":null,"amount_text":null,"lead_investors":[],"investors":[],"founders":[{"name":"","role":"","linkedin":null,"x":null}],"description":"","unique":null,"use_of_funds":null,"summary":"","announced_on":null}],"excluded":[{"id":${Number(item.id)},"reason":"not_funding"}]}`;
@@ -166,7 +172,45 @@ async function companyTargets(body: Record<string, unknown>) {
   const rows = await sql`select distinct c.domain from wgf.companies c join wgf.rounds r on r.company_id = c.id
                          where c.domain is not null and c.site_checked_at is null and r.status = 'live'
                            and r.created_at > now() - make_interval(days => ${days})`;
-  return { domains: rows.map((r) => r.domain) };
+  // Companies with no website yet: searched once on Google (Apify) to find it
+  const missing = await sql`select distinct c.id, c.name, c.hq_country from wgf.companies c join wgf.rounds r on r.company_id = c.id
+                            where c.domain is null and c.domain_checked_at is null and r.status = 'live'
+                              and r.created_at > now() - make_interval(days => ${days}) limit 300`;
+  return {
+    domains: rows.map((r) => r.domain),
+    need_domain: missing.map((m) => ({ id: Number(m.id), name: m.name, query: `${m.name} ${m.hq_country ?? ""} startup official website`.replace(/\s+/g, " ").trim() })),
+  };
+}
+
+// Hosts that are never a company's own website
+const NOT_OWN_SITE = /(^|\.)(linkedin|facebook|twitter|x|instagram|youtube|wikipedia|crunchbase|pitchbook|tracxn|dealroom|cbinsights|bloomberg|reuters|techcrunch|forbes|businesswire|prnewswire|globenewswire|medium|github|apple|google|play\.google|glassdoor|indeed|zoominfo|rocketreach|owler|craft|f6s|angel|wellfound|36kr|qcc|tianyancha|aiqicha|baike|zhihu|weibo|sina|sohu|163|qq|naver|daum|nikkei|prtimes|yahoo|msn|ycombinator|producthunt|g2|capterra|trustpilot|bbb|yelp|amazon|appadvice|similarweb|semrush|economictimes|inc42|yourstory|entrackr|vccircle|sifted|eu-startups|tech\.eu|finsmes|vcnewsnetwork|substack)\.[a-z.]+$/i;
+const tokens = (s: string) => s.toLowerCase().normalize("NFKD").replace(/[^a-z0-9 ]/g, " ").split(/\s+/)
+  .filter((t) => t.length > 2 && !["inc", "ltd", "llc", "the", "labs", "lab", "technologies", "technology", "tech", "group", "gmbh", "corp", "company", "co"].includes(t));
+
+async function companyDomains(body: Record<string, unknown>) {
+  const items = (Array.isArray(body.items) ? body.items : []) as { id: number; name: string; results: { url: string; title?: string }[] }[];
+  let found = 0;
+  for (const it of items) {
+    const want = tokens(String(it.name ?? ""));
+    let pick: string | null = null;
+    for (const r of (it.results ?? []).slice(0, 6)) {
+      const d = cleanDomain(r.url);
+      if (!d || NOT_OWN_SITE.test(d)) continue;
+      const label = d.split(".").slice(0, -1).join("").replace(/-/g, "");
+      const compact = want.join("");
+      // Accept the site when its name is the company name, give or take a short prefix or suffix (getx, xhq, xapp)
+      const close = label === compact || ((label.startsWith(compact) || label.endsWith(compact)) && label.length - compact.length <= 6)
+        || (compact.startsWith(label) && label.length >= 5 && compact.length - label.length <= 6);
+      if (want.length && close) { pick = d; break; }
+    }
+    if (pick) {
+      const [taken] = await sql`select id from wgf.companies where domain = ${pick} and id <> ${Number(it.id)}`;
+      if (taken) pick = null;
+    }
+    await sql`update wgf.companies set domain = coalesce(domain, ${pick}), domain_checked_at = now() where id = ${Number(it.id)}`;
+    if (pick) found++;
+  }
+  return { received: items.length, domains_found: found };
 }
 
 async function companySave(body: Record<string, unknown>) {
@@ -245,7 +289,7 @@ async function save(ids: number[], text: string) {
     const firstPub = itemIds.map((i) => byId.get(i)!.published_at).filter(Boolean).sort()[0] ?? new Date().toISOString();
     const announced = /^\d{4}-\d{2}-\d{2}$/.test(String(r.announced_on)) ? String(r.announced_on) : String(new Date(firstPub).toISOString()).slice(0, 10);
 
-    const status = UNNAMED_COMPANY.test(company) ? "unnamed"
+    let status = UNNAMED_COMPANY.test(company) ? "unnamed"
       : Date.parse(announced) < Date.parse(String(new Date(firstPub).toISOString()).slice(0, 10)) - 30 * 864e5 ? "stale" : "live";
 
     // company: domain first, then name (+ country when both known)
@@ -260,8 +304,22 @@ async function save(ids: number[], text: string) {
     const socialUrl = (v: unknown, host: RegExp) => { const u = str(v, 300); return u && host.test(u) ? u.split("?")[0] : null; };
     const coLinkedin = socialUrl(cs.linkedin, /^https?:\/\/([a-z]+\.)?linkedin\.com\/company\//i);
     const coX = socialUrl(cs.x, /^https?:\/\/(www\.)?(x|twitter)\.com\/[A-Za-z0-9_]{1,15}\/?$/i);
+    let repeat = false;
     if (co) {
       await sql`update wgf.companies set linkedin_url = coalesce(linkedin_url, ${coLinkedin}), x_url = coalesce(x_url, ${coX}) where id = ${co.id}`;
+      // An old round of about the same size coming back as news is a resurfaced story
+      if (amountUsd) {
+        const [old] = await sql`select 1 from wgf.rounds where company_id = ${co.id} and amount_usd between ${amountUsd * 0.9} and ${amountUsd * 1.1}
+                                 and coalesce(announced_on, created_at::date) < ${announced}::date - 30 limit 1`;
+        repeat = Boolean(old);
+      }
+      // Replace an original-script company name with the English one when it arrives
+      if (!NON_LATIN.test(company)) {
+        const [cur] = await sql`select name from wgf.companies where id = ${co.id}`;
+        if (cur && NON_LATIN.test(cur.name) && !/[A-Za-z]/.test(cur.name)) {
+          await sql`update wgf.companies set name = ${company}, name_en = ${company}, name_native = coalesce(name_native, ${cur.name}) where id = ${co.id}`;
+        }
+      }
       await sql`update wgf.companies set
                   domain = coalesce(domain, ${domain}), name_native = coalesce(name_native, ${native}),
                   hq_city = coalesce(hq_city, ${str(r.hq_city, 100)}), hq_country = coalesce(hq_country, ${country}),
@@ -275,6 +333,7 @@ async function save(ids: number[], text: string) {
                        returning id`;
     }
 
+    if (repeat && status === "live") status = "stale";
     // round: same company, compatible stage, within 14 days
     let [rd] = await sql`select id from wgf.rounds
                          where company_id = ${co.id}
@@ -302,7 +361,9 @@ async function save(ids: number[], text: string) {
 
     // investors
     const real = (v: unknown) => names(v).filter((n) => !GENERIC_INVESTOR.test(n));
-    const leads = real(r.lead_investors), others = real(r.investors).filter((n) => !leads.includes(n));
+    // "Dragoneer" and "Dragoneer Investment Group" in one list: keep the longer name only
+    const dedupe = (list: string[]) => list.filter((n) => !list.some((m) => m.length > n.length && m.toLowerCase().startsWith(n.toLowerCase() + " ")));
+    const leads = dedupe(real(r.lead_investors)), others = dedupe(real(r.investors)).filter((n) => !leads.some((l) => l === n || l.toLowerCase().startsWith(n.toLowerCase() + " ") || n.toLowerCase().startsWith(l.toLowerCase() + " ")));
     for (const [list, isLead] of [[leads, true], [others, false]] as const) {
       for (const name of list) {
         const [inv] = await sql`insert into wgf.investors (name, name_key) values (${name}, wgf.name_key(${name}))
@@ -400,7 +461,8 @@ Deno.serve(async (req) => {
     if (body.mode === "ingest") return json(await ingest(body));
     if (body.mode === "company_targets") return json(await companyTargets(body));
     if (body.mode === "company_save") return json(await companySave(body));
-    return json({ error: "mode must be plan, prompt, save, ingest, company_targets or company_save" }, 400);
+    if (body.mode === "company_domains") return json(await companyDomains(body));
+    return json({ error: "mode must be plan, prompt, save, ingest, company_targets, company_domains or company_save" }, 400);
   } catch (e) {
     return json({ error: String((e as Error).message ?? e) }, 500);
   }

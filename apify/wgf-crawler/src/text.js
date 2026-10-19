@@ -153,10 +153,10 @@ export function parseCompanySite(html, pageUrl) {
     if (host === "linkedin.com" && /^\/company\//.test(p)) socials.linkedin ??= `https://www.linkedin.com${p}`;
     else if (host === "linkedin.com" && /^\/in\//.test(p)) people.push({ linkedin: `https://www.linkedin.com${p}`, label: text.slice(0, 60) });
     else if ((host === "x.com" || host === "twitter.com") && /^\/[A-Za-z0-9_]{1,15}$/.test(p) && !/^\/(intent|share|home)$/i.test(p)) socials.x ??= `https://x.com${p}`;
-    else if (host === "instagram.com" && /^\/[^/]+$/.test(p)) socials.instagram ??= `https://www.instagram.com${p}`;
-    else if (host === "youtube.com" && p) socials.youtube ??= `https://www.youtube.com${p}`;
+    else if (host === "instagram.com" && /^\/[^/]+$/.test(p) && !/^\/(p|reel|explore|accounts)$/.test(p)) socials.instagram ??= `https://www.instagram.com${p}`;
+    else if (host === "youtube.com" && /^\/(@[^/]+|c\/[^/]+|channel\/[^/]+|user\/[^/]+)$/.test(p)) socials.youtube ??= `https://www.youtube.com${p}`;
     else if (host === "github.com" && /^\/[^/]+$/.test(p)) socials.github ??= `https://github.com${p}`;
-    else if (host === "facebook.com" && /^\/[^/]+$/.test(p)) socials.facebook ??= `https://www.facebook.com${p}`;
+    else if (host === "facebook.com" && /^\/[^/]+$/.test(p) && !/^\/(sharer|share|dialog|plugins|watch)(\.php)?$/.test(p)) socials.facebook ??= `https://www.facebook.com${p}`;
     if (host === base.hostname.replace(/^www\./, "") || host.endsWith("." + base.hostname.replace(/^www\./, ""))) {
       if (/(^|\/)(about|team|company|leadership|founders|our-team|who-we-are|people)(\/|$)/i.test(p)) pages.add(u.origin + u.pathname);
       if (!careers && /(^|\/)(careers|jobs|join-us|work-with-us)(\/|$)/i.test(p)) careers = u.origin + u.pathname;

@@ -50,13 +50,14 @@ t("listing links", () => {
 t("company site", () => {
   const html = `<meta property="og:description" content="Acme builds robots"><a href="https://www.linkedin.com/company/acme/">in</a><a href="https://x.com/acmehq">x</a>
   <a href="https://twitter.com/intent/tweet">t</a><a href="/about-us">about</a><a href="/team">Team</a><a href="https://jobs.lever.co/acme">Jobs</a>
-  <a href="https://www.linkedin.com/in/jane-doe/">Jane Doe, CEO</a>`;
+  <a href="https://www.linkedin.com/in/jane-doe/">Jane Doe, CEO</a><a href="https://www.youtube.com/watch?v=1">v</a><a href="https://www.youtube.com/@acme">yt</a>`;
   const s = parseCompanySite(html, "https://acme.com/");
   assert.equal(s.socials.linkedin, "https://www.linkedin.com/company/acme");
   assert.equal(s.socials.x, "https://x.com/acmehq");
   assert.equal(s.people[0].linkedin, "https://www.linkedin.com/in/jane-doe");
   assert.deepEqual(s.about_pages, ["https://acme.com/team"]);
   assert.equal(s.careers_url, "https://jobs.lever.co/acme");
+  assert.equal(s.socials.youtube, "https://www.youtube.com/@acme");
 });
 
 t("funding headline filter", () => {
