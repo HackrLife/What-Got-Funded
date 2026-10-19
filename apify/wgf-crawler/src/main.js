@@ -66,8 +66,19 @@ async function crawlArticles(input) {
   const candidates = new Map();   // url -> candidate
   const addCandidate = (c) => { const k = c.url.split("#")[0]; if (!candidates.has(k)) candidates.set(k, c); };
 
+  // Google News searches are pinned to the target day (and the day after, for late local coverage) with
+  // after:/before: operators instead of a rolling "when:2d", so only that day's fresh reports come back.
+  const pinDay = (url) => {
+    if (!/news\.google\.com\/rss\/search/.test(url)) return url;
+    const u = new URL(url);
+    const q = (u.searchParams.get("q") || "").replace(/\s*when:\d+[dh]\b/g, "").replace(/\s*(after|before):\S+/g, "").trim();
+    u.searchParams.set("q", `${q} after:${addDays(target, -1)} before:${addDays(target, 2)}`);
+    return u.toString();
+  };
+
   // 1. feeds (site RSS and Google News searches)
-  await pool(feeds, concurrency, async (f) => {
+  await pool(feeds, concurrency, async (f0) => {
+    const f = { ...f0, feed_url: pinDay(f0.feed_url) };
     const r = await politely(f.feed_url, () => get(f.feed_url, { accept: "application/rss+xml,application/atom+xml,application/xml,text/xml,*/*" }));
     if (!r.ok) { health.push({ source: f.source, kind: "feed", url: f.feed_url, ok: false, error: r.error || `HTTP ${r.status}` }); return; }
     const items = parseFeed(r.text);
