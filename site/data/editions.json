@@ -1,0 +1,9 @@
+{
+  "2026-10-18": {
+    "rounds": {
+      "_note": "Investor names merged where sources translated the same firm differently.",
+      "Fa'ao Robotics": { "leads": ["Meituan Longzhu"], "investors": ["Guolian Minsheng Capital", "Jiangsu Industrial Investment", "Qingliu Capital", "Shishan Phase II Fund", "Suzhou Chuangtou", "Yongxin Capital"] },
+      "MemSilicon": { "leads": ["Boyuan Capital"], "investors": ["Bosch Ventures", "CAS Star (Zhongke Chuangxing)", "China Development Bank Science and Technology Innovation", "Chuangling Capital", "Furong Investment", "GigaDevice", "Hengyu Capital", "Jinqiu Fund", "miHoYo", "Monolith", "Shunxi Fund", "Xiaomi", "Zhongguancun Science City"] }
+    }
+  }
+}

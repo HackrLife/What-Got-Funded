@@ -314,3 +314,51 @@ aside .panel p { font-size: 15px; color: var(--muted); }
 @media (max-width: 860px) { .regcards { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 560px) { .regcards { grid-template-columns: 1fr; } .regcard .srct { width: calc(100% - 32px); margin: 0 16px 16px; } .regcard summary { padding: 18px 16px; } }
 .regcard .rnum small { display: block; font-size: 12px; font-weight: 600; color: var(--muted); text-align: right; margin-top: 4px; letter-spacing: .02em; }
+
+/* ---------- daily editions ---------- */
+.edfeed { padding: 32px var(--gut) 0; display: grid; gap: 20px; }
+.edfeed.list { grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); padding-top: 32px; }
+.edcard { display: grid; gap: 10px; padding: 26px 28px; border: 1px solid var(--line); border-left: 6px solid var(--ink); background: #fff; color: var(--ink); text-decoration: none; transition: box-shadow .15s; }
+.edcard:hover { box-shadow: 0 6px 24px rgba(23,32,51,.10); }
+.edcard .kick, .ed .kick { font-size: 13px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: var(--muted); }
+.edcard b:first-of-type { font-stretch: 112%; font-weight: 800; font-size: 28px; line-height: 1.15; letter-spacing: -0.015em; }
+.edcard .dek { color: var(--muted); font-size: 16px; }
+.edcard .stats { display: flex; gap: 28px; flex-wrap: wrap; font-size: 14px; color: var(--muted); }
+.edcard .stats b { color: var(--ink); font-size: 20px; margin-right: 4px; }
+.edcard .more { font-weight: 700; font-size: 15px; text-decoration: underline; }
+.ed { max-width: 860px; margin: 0 auto; padding: 48px 24px 0; }
+.ed-h h1 { margin-top: 10px; font-stretch: 112%; font-weight: 850; font-size: clamp(32px, 4.4vw, 50px); line-height: 1.06; letter-spacing: -0.02em; }
+.ed-h .dek { margin-top: 16px; font-size: 19px; color: var(--muted); }
+.viz { margin-top: 36px; display: grid; gap: 22px; }
+.viz figure { margin: 0; border: 1px solid var(--line); background: #fff; }
+.viz svg { display: block; width: 100%; height: auto; }
+.ed-toc { position: sticky; top: 0; z-index: 5; margin-top: 36px; padding: 12px 0; background: #fff; border-bottom: 1px solid var(--line); display: flex; gap: 10px; flex-wrap: wrap; }
+.ed-toc a { padding: 6px 12px; border: 1px solid var(--line); border-left: 4px solid var(--c); font-size: 14px; font-weight: 600; color: var(--ink); text-decoration: none; }
+.ed-toc small { color: var(--muted); font-weight: 500; }
+.reg { margin-top: 48px; scroll-margin-top: 70px; }
+.reg > h2 { font-stretch: 112%; font-weight: 800; font-size: 30px; padding-bottom: 10px; border-bottom: 4px solid var(--c); }
+.reg h2 small, .ctry h3 small { font-size: 15px; font-weight: 500; color: var(--muted); margin-left: 6px; letter-spacing: 0; }
+.ctry { margin-top: 28px; }
+.ctry > h3 { font-size: 20px; font-weight: 750; color: var(--muted); }
+.su { margin-top: 18px; padding: 22px 0 6px; border-top: 1px solid var(--line); }
+.su h4 { font-stretch: 112%; font-weight: 800; font-size: 24px; line-height: 1.15; }
+.su h4 a { color: var(--ink); text-decoration: none; }
+.su h4 a:hover { text-decoration: underline; }
+.su p { margin-top: 10px; font-size: 16.5px; line-height: 1.55; }
+.su .what { font-weight: 600; }
+.su .uq { background: var(--mist); padding: 10px 14px; }
+.su dl { margin-top: 14px; display: grid; grid-template-columns: 150px 1fr; gap: 6px 16px; font-size: 15px; }
+.su dt { color: var(--muted); }
+.su dd { margin: 0; }
+.su dd a, .su .fd a, .su .srcs a { color: var(--ink); }
+.su .fd { margin-top: 12px; font-size: 15px; }
+.su .fd ul { margin: 6px 0 0; padding-left: 18px; }
+.su .fd .pl { color: var(--muted); font-size: 14px; }
+.su .srcs { font-size: 14px; color: var(--muted); }
+.ed-nav { margin-top: 56px; padding-top: 20px; border-top: 1px solid var(--line); display: flex; justify-content: space-between; gap: 12px; font-weight: 600; }
+@media (max-width: 760px) {
+  .edfeed.list { grid-template-columns: 1fr; }
+  .edcard { padding: 20px; } .edcard b:first-of-type { font-size: 23px; }
+  .ed { padding: 28px 16px 0; }
+  .su dl { grid-template-columns: 1fr; gap: 2px; } .su dt { margin-top: 6px; }
+}

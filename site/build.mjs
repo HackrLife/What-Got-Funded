@@ -9,6 +9,9 @@ import path from "node:path";
 import crypto from "node:crypto";
 import { fileURLToPath } from "node:url";
 import { CONTINENTS, continentOf, countryLabel } from "./src/regions.mjs";
+import { editionModel, articleBody, editionCard } from "./src/edition.mjs";
+// Daily editions start with the 18 October 2026 issue. Headline overrides: data/editions.json { "YYYY-MM-DD": { "headline": "...", "dek": "..." } }
+const EDITION_START = "2026-10-18";
 
 const ROOT = path.dirname(fileURLToPath(import.meta.url));
 const OUT = path.join(ROOT, "dist");
@@ -84,7 +87,7 @@ function amountCell(r) {
 // ---------- page shell ----------
 let CSS_HREF = "/assets/styles.css", JS_SRC = "/assets/app.js";
 function shell({ title, desc, active = "", body, canonical, scripts = "" }) {
-  const nav = [["/", "Today"], ["/analysis/", "Analysis"], ["/investors/", "Investors"], ["/jobs/", "Jobs"], ["/about/", "About"]]
+  const nav = [["/", "Today"], ["/editions/", "Editions"], ["/analysis/", "Analysis"], ["/investors/", "Investors"], ["/jobs/", "Jobs"], ["/about/", "About"]]
     .map(([h, t]) => `<a href="${h}"${active === t ? ' class="on" aria-current="page"' : ""}>${t}</a>`).join("");
   return `<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
@@ -107,7 +110,7 @@ ${body}
 </main>
 <footer class="foot">
   <div><b>What Got Funded</b><p>Daily startup funding intelligence from public sources. Every round links to where it was reported.</p></div>
-  <div><b>Read</b><a href="/">Today</a><a href="/analysis/">Analysis</a><a href="/investors/">Investors</a><a href="/jobs/">Jobs</a></div>
+  <div><b>Read</b><a href="/">Today</a><a href="/editions/">Daily editions</a><a href="/analysis/">Analysis</a><a href="/investors/">Investors</a><a href="/jobs/">Jobs</a></div>
   <div><b>About</b><a href="/about/">About us and our sources</a><a href="/methodology/">Methodology</a><a href="/subscribe/">Subscribe</a><a href="mailto:dev@hackrlife.com?subject=Correction%20for%20What%20Got%20Funded">Request a correction</a></div>
 </footer>
 <script src="${JS_SRC}" defer></script>${scripts}
@@ -172,7 +175,7 @@ function treemapData(rows) {
 }
 
 // ---------- pages ----------
-function homePage(day, rows, prev, next, isYesterday) {
+function homePage(day, rows, prev, next, isYesterday, edCards = "") {
   const disclosed = rows.filter((r) => r.amount_usd);
   const total = sum(disclosed.map((r) => r.amount_usd));
   const when = isYesterday ? "Yesterday" : `On ${weekday(day)}`;
@@ -196,6 +199,7 @@ function homePage(day, rows, prev, next, isYesterday) {
 
   const top = [...rows].sort((a, b) => (b.amount_usd || 0) - (a.amount_usd || 0)).slice(0, 10);
   const body = `
+${edCards ? `<section class="edfeed" aria-label="Daily editions">${edCards}</section>` : ""}
 <section class="hero">
   <div class="dayline"><span>${longDate(day)}, all markets</span><span class="daynav">${prev ? `<a href="/day/${prev}/">Previous day</a>` : '<span class="off">Previous day</span>'}<span>|</span><a href="/day/${day}/">Every round</a></span></div>
   <div class="lead">
@@ -548,7 +552,15 @@ async function main() {
   const homeDay = byDay.has(yesterday) ? yesterday : days[days.length - 1];
   const idx = (d) => days.indexOf(d);
   const prevOf = (d) => days[idx(d) - 1] || null, nextOf = (d) => days[idx(d) + 1] || null;
-  write("index.html", homePage(homeDay, byDay.get(homeDay), prevOf(homeDay), nextOf(homeDay), homeDay === yesterday));
+  const overrides = fs.existsSync(path.join(ROOT, "data", "editions.json")) ? JSON.parse(fs.readFileSync(path.join(ROOT, "data", "editions.json"), "utf8")) : {};
+  const edDays = days.filter((d) => d >= EDITION_START);
+  const editions = edDays.map((d) => editionModel(d, byDay.get(d), { continents: CONTINENTS, override: overrides[d] || {} }));
+  editions.forEach((m, i) => write(`editions/${m.day}/index.html`, shell({ title: `${m.headline} | What Got Funded`, desc: m.dek, active: "Editions",
+    body: articleBody(m, { prev: edDays[i - 1], next: edDays[i + 1] }) + joinBand(), canonical: `/editions/${m.day}/`, scripts: BEEHIIV_SCRIPT })));
+  const cards = [...editions].reverse();
+  write("editions/index.html", shell({ title: "Daily editions | What Got Funded", desc: "Every day's startup funding, as one story with the four charts and every round.", active: "Editions",
+    body: `<div class="narrow"><h1>Daily editions</h1><p class="sub">One story a day: the day's total, funding by region, top investors, funding by industry, then every startup that announced a round.</p></div><section class="edfeed list">${cards.map(editionCard).join("")}</section>`, canonical: "/editions/" }));
+  write("index.html", homePage(homeDay, byDay.get(homeDay), prevOf(homeDay), nextOf(homeDay), homeDay === yesterday, cards.slice(0, 1).map(editionCard).join("")));
   for (const d of days) write(`day/${d}/index.html`, dayPage(d, byDay.get(d), prevOf(d), nextOf(d)));
 
   const byCo = new Map();
@@ -569,7 +581,7 @@ async function main() {
   write("subscribe/index.html", subscribePage());
   write("404.html", notFoundPage());
 
-  const urls = ["/", "/analysis/", "/investors/", "/jobs/", "/about/", "/methodology/", "/subscribe/", ...days.map((d) => `/day/${d}/`), ...[...byCo.values()].map((rs) => rs[0].href)];
+  const urls = ["/", "/editions/", ...edDays.map((d) => `/editions/${d}/`), "/analysis/", "/investors/", "/jobs/", "/about/", "/methodology/", "/subscribe/", ...days.map((d) => `/day/${d}/`), ...[...byCo.values()].map((rs) => rs[0].href)];
   write("sitemap.xml", `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls.map((u) => `<url><loc>${SITE_URL}${u}</loc></url>`).join("\n")}\n</urlset>\n`);
   write("robots.txt", `User-agent: *\nAllow: /\nSitemap: ${SITE_URL}/sitemap.xml\n`);
 
