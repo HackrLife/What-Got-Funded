@@ -14,10 +14,26 @@ const lenient = { response: { response: { neverError: true, responseFormat: 'jso
 const apify = { authentication: 'genericCredentialType', genericAuthType: 'httpBearerAuth' };
 const apifyCred = { httpBearerAuth: { id: 'U4EQeOM0Nov43zUK', name: 'Apify API' } };
 
+// The n8n server runs on New York time, so the trigger fires hourly and only 10pm in Sydney passes.
 const schedule = trigger({
   type: 'n8n-nodes-base.scheduleTrigger',
   version: 1.3,
-  config: { name: 'Daily 10pm Sydney', parameters: { rule: { interval: [{ field: 'cronExpression', expression: '0 0 22 * * *' }] } } },
+  config: { name: 'Every hour', parameters: { rule: { interval: [{ field: 'cronExpression', expression: '0 0 * * * *' }] } } },
+});
+
+const is10pm = node({
+  type: 'n8n-nodes-base.filter',
+  version: 2.2,
+  config: {
+    name: '10pm in Sydney',
+    parameters: {
+      conditions: {
+        options: { caseSensitive: true, leftValue: '', typeValidation: 'loose' },
+        conditions: [{ leftValue: expr("{{ $now.setZone('Australia/Sydney').hour }}"), rightValue: 22, operator: { type: 'number', operation: 'equals' } }],
+        combinator: 'and',
+      },
+    },
+  },
 });
 const runNow = trigger({ type: 'n8n-nodes-base.manualTrigger', version: 1, config: { name: 'Run now' } });
 
@@ -290,6 +306,7 @@ const saveSites = node({
 
 export default workflow('wgf-daily-extract', 'WGF — Daily Extract (10pm)')
   .add(schedule)
+  .to(is10pm)
   .to(getArticles)
   .to(chunkArticles)
   .to(ingest)
