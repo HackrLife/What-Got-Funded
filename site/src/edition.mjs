@@ -33,6 +33,28 @@ export function cleanInvestors(list) {
     .filter((x, i, a) => a.findIndex((y) => key(y) === key(x)) === i);
 }
 
+// Founders: one entry per person. Original-script duplicates are dropped when a Latin-script name exists;
+// the shortest complete role is kept and profile links are merged.
+export function cleanFounders(list) {
+  const people = (list || []).filter((p) => p && p.name);
+  const hasLatin = people.some((p) => !NON_LATIN.test(p.name));
+  const key = (n) => n.toLowerCase().normalize("NFKD").replace(/[^a-z]/g, "");
+  const out = new Map();
+  for (const p of people) {
+    if (hasLatin && NON_LATIN.test(p.name)) continue;
+    const k = key(p.name) || p.name;
+    // near-duplicates such as "Simo Lachdi" / "Simo Lachidi"
+    const match = [...out.keys()].find((x) => x === k || (Math.abs(x.length - k.length) <= 1 && [...x].filter((c, i) => c !== k[i]).length <= 2 && x.slice(0, 4) === k.slice(0, 4)));
+    const role = p.role && !/[(;]\s*[^)]*$/.test(p.role) ? p.role : (p.role || "").replace(/\s*[(;].*$/, "");
+    if (!match) { out.set(k, { ...p, role }); continue; }
+    const e = out.get(match);
+    if (role && (!e.role || role.length < e.role.length || /co-?founder/i.test(role) && !/co-?founder/i.test(e.role))) e.role = role;
+    e.linkedin_url ||= p.linkedin_url; e.x_url ||= p.x_url;
+  }
+  return [...out.values()];
+}
+const VAGUE = /not (described|stated)|does not describe|no further detail/i;
+
 // ---------- model ----------
 export function editionModel(day, rows, { continents, override = {} } = {}) {
   const fixes = override.rounds || {};
@@ -41,7 +63,7 @@ export function editionModel(day, rows, { continents, override = {} } = {}) {
     r = { ...r, ...fx };
     const leads = cleanInvestors(r.leads || []);
     const investors = cleanInvestors(r.investors || []).filter((x) => !leads.includes(x));
-    return { ...r, leads, investors };
+    return { ...r, leads, investors, founders: cleanFounders(r.founders), description: VAGUE.test(r.description || "") ? null : r.description };
   }).sort((a, b) => (b.amount_usd || 0) - (a.amount_usd || 0) || a.company.localeCompare(b.company));
   const disclosed = rounds.filter((r) => r.amount_usd);
   const total = sum(disclosed.map((r) => r.amount_usd));

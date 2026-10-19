@@ -10,7 +10,7 @@
 // Every dataset can be exported as CSV or JSON from the Apify console or API.
 import { getInput, pushData, setValue, flushLocal, log } from "./platform.js";
 import { get, allowed, pool, sleep } from "./http.js";
-import { parseFeed, parseArticle, listingLinks, parseCompanySite, urlDate, toIso } from "./text.js";
+import { parseFeed, parseArticle, listingLinks, parseCompanySite, urlDate, urlMonth, toIso } from "./text.js";
 import { resolveGoogleNews } from "./gnews.js";
 import { isFundingHeadline } from "./funding.js";
 
@@ -95,6 +95,8 @@ async function crawlArticles(input) {
       if (p.filter !== "none" && !isFundingHeadline(l.title)) continue;
       const d = urlDate(l.url);
       if (d && d < addDays(target, -1)) continue;                     // URL says it is older than the target day
+      const um = urlMonth(l.url);
+      if (um && um < addDays(target, -1).slice(0, 7)) continue;        // URL month is before the target month
       addCandidate({ url: l.url, title: l.title, feed_date: null, summary: "", source: p.source, found_via: "page", filtered: p.filter !== "none", market: p.market, region: null, source_language: null });
       if (++kept >= 60) break;
     }
@@ -118,6 +120,8 @@ async function crawlArticles(input) {
   let saved = 0, skippedDate = 0, failed = 0, blocked = 0, notFunding = 0;
   await pool(list, concurrency, async (c) => {
     if (!(await allowed(c.url))) { blocked++; return; }
+    const um = urlMonth(c.url), ud = urlDate(c.url);
+    if ((ud && ud < addDays(target, -1)) || (um && um < addDays(target, -1).slice(0, 7))) { skippedDate++; return; }   // the URL itself is dated earlier
     const r = await politely(c.url, () => get(c.url, { browserUa: true }));
     if (!r.ok || !/html/i.test(r.type)) { failed++; return; }
     const a = parseArticle(r.text, r.url || c.url);

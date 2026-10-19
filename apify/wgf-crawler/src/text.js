@@ -78,6 +78,12 @@ export function urlDate(url) {
   return null;
 }
 
+// Year and month from URLs like /2026/09/slug (no day). Used to drop old articles that pages re-date.
+export function urlMonth(url) {
+  const m = /\/(20\d{2})\/(0[1-9]|1[0-2])\/(?!\d{1,2}\/)/.exec(String(url));
+  return m ? `${m[1]}-${m[2]}` : null;
+}
+
 const SOCIAL = /^(?:www\.)?(linkedin\.com|x\.com|twitter\.com|instagram\.com|facebook\.com|youtube\.com|github\.com|crunchbase\.com|t\.me|tiktok\.com)$/i;
 const NOT_COMPANY = /(^|\.)(google|googleusercontent|gstatic|doubleclick|facebook|twitter|x|linkedin|instagram|youtube|youtu|tiktok|apple|wikipedia|wikimedia|amazonaws|cloudfront|wordpress|wp|gravatar|bit|t|ow|lnkd|feedburner|addtoany|sharethis|disqus|cdn|akamaized|jsdelivr|unpkg|cloudflare|gnews|prnewswire|businesswire|globenewswire|newswire|einpresswire|crunchbase|pitchbook|dealroom|tracxn|cbinsights|medium|substack|reddit|whatsapp|telegram|weibo|wechat|qq|baidu|line|naver|kakao|yahoo|bing|msn|archive|mailto|apple)\.[a-z.]+$/i;
 

@@ -286,6 +286,11 @@ async function save(ids: number[], text: string) {
   const byId = new Map(items.map((i) => [Number(i.id), i]));
   const touched = new Set<number>();
   let created = 0, merged = 0;
+  // Roundup articles (one article naming many rounds) mostly recap older deals: their rounds are held as unverified
+  // unless another article in the batch also reports them.
+  const perItem = new Map<number, number>();
+  for (const r of rounds) for (const i of new Set((Array.isArray(r.item_ids) ? r.item_ids : []).map(Number))) perItem.set(i, (perItem.get(i) ?? 0) + 1);
+  const urlMonth = (u: string) => { const m = /\/(20\d{2})\/(0[1-9]|1[0-2])\//.exec(u); return m ? `${m[1]}-${m[2]}` : null; };
 
   for (const r of rounds) {
     const itemIds = (Array.isArray(r.item_ids) ? r.item_ids : []).map(Number).filter((i) => byId.has(i));
@@ -348,6 +353,10 @@ async function save(ids: number[], text: string) {
     }
 
     if (repeat && status === "live") status = "stale";
+    // Every source URL dated to an earlier month than the announcement: an old story re-dated by the page
+    const months = itemIds.map((i) => urlMonth(String(byId.get(i)!.url))).filter(Boolean) as string[];
+    if (months.length === itemIds.length && months.every((mo) => mo < announced.slice(0, 7)) && status === "live") status = "stale";
+    if (itemIds.every((i) => (perItem.get(i) ?? 0) >= 4) && status === "live") status = "unverified";
     // Announced on an earlier, unstated day: kept for the record but not counted on the article's day
     if (notFresh && status === "live") status = "unverified";
     // round: same company, compatible stage, within 14 days

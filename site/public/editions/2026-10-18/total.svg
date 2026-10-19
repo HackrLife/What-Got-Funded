@@ -2,8 +2,8 @@
 <rect width="720" height="200" fill="#fff"/>
 <text x="24" y="30" font-size="19" font-weight="700" fill="#172033">Total funding</text>
 <text x="24" y="50" font-size="13" fill="#5b6678">Disclosed amounts, in US dollars</text>
-<text x="24" y="120" font-size="64" font-weight="800" fill="#172033">$11.1B</text>
-<text x="24" y="160" font-size="16" fill="#5b6678">45 rounds, 29 with a disclosed amount</text>
+<text x="24" y="120" font-size="64" font-weight="800" fill="#172033">$10.8B</text>
+<text x="24" y="160" font-size="16" fill="#5b6678">41 rounds, 26 with a disclosed amount</text>
 <line x1="400" x2="400" y1="70" y2="170" stroke="#d5dbe3"/>
 <text x="424" y="92" font-size="13" fill="#5b6678">Largest round</text>
 <text x="424" y="118" font-size="20" font-weight="700" fill="#172033">Blue Origin</text>
