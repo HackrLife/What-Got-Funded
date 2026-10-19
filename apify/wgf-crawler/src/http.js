@@ -66,7 +66,7 @@ export async function pool(items, limit, fn) {
   const out = new Array(items.length);
   let i = 0;
   const workers = Array.from({ length: Math.min(limit, items.length) }, async () => {
-    while (i < items.length) { const k = i++; try { out[k] = await fn(items[k], k); } catch (e) { out[k] = { error: String(e) }; } }
+    while (i < items.length) { const k = i++; try { out[k] = await fn(items[k], k); } catch (e) { out[k] = { error: String(e) }; if (!pool.logged) { pool.logged = 0; } if (pool.logged++ < 5) console.error("task error:", String(e).slice(0, 300)); } }
   });
   await Promise.all(workers);
   return out;

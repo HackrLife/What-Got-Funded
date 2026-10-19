@@ -53,7 +53,7 @@ async function crawlArticles(input) {
   const windowStart = Date.parse(addDays(target, -1) + "T10:00:00Z");   // UTC+14 start of the target day, minus slack
   const repo = input.sourcesRepo || DEFAULT_REPO;
   const concurrency = input.concurrency || 12;
-  const maxArticles = input.maxArticles || 800;
+  const maxArticles = input.maxArticles || 2000;
   log(`target day ${target}`);
 
   const feeds = (await loadCsv(repo, "n8n-feeds.csv")).filter((f) => f.feed_url && f.feed_status !== "broken");
@@ -108,6 +108,7 @@ async function crawlArticles(input) {
     if (real) { c.google_url = c.url; c.url = real; } else c.unresolved = true;
     await sleep(250);
   });
+  log(`Google News links resolved; ${list.filter((c) => c.unresolved).length} could not be resolved`);
   const seen = new Set();
   list = list.filter((c) => !c.unresolved && !seen.has(c.url) && seen.add(c.url));
 
@@ -135,7 +136,7 @@ async function crawlArticles(input) {
       social_links: a.socials,
       fetched_at: new Date().toISOString(),
     });
-    saved++;
+    if (++saved % 50 === 0) log(`${saved} articles saved`);
   });
 
   const summary = { target_date: target, feeds: feeds.length, pages: pages.length, candidates: candidates.size, articles_saved: saved, skipped_other_dates: skippedDate, fetch_failed: failed, robots_blocked: blocked };

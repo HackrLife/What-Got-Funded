@@ -40,7 +40,7 @@
     "maxArticles": {
       "title": "Max articles",
       "type": "integer",
-      "default": 800,
+      "default": 2000,
       "minimum": 10,
       "description": "Upper limit on articles fetched per run.",
       "editor": "number"

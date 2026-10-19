@@ -3,7 +3,8 @@
 import fs from "node:fs";
 import path from "node:path";
 
-const API = process.env.APIFY_API_BASE_URL || "https://api.apify.com/v2";
+// Apify sets APIFY_API_BASE_URL without the version path (e.g. https://api.apify.com)
+const API = (process.env.APIFY_API_BASE_URL || "https://api.apify.com").replace(/\/+$/, "").replace(/\/v2$/, "") + "/v2";
 const TOKEN = process.env.APIFY_TOKEN;
 const ON_PLATFORM = Boolean(TOKEN && process.env.APIFY_DEFAULT_DATASET_ID);
 const LOCAL_DIR = path.resolve("storage");
