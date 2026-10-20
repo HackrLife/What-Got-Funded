@@ -381,7 +381,12 @@ const cleanDomain = (v: unknown) => {
 };
 
 // ---------- save ----------
+// Saves run one at a time: two articles about the same round saved at the same moment would otherwise both create it.
 async function save(ids: number[], text: string) {
+  await sql`select pg_advisory_lock(4242)`;
+  try { return await saveLocked(ids, text); } finally { await sql`select pg_advisory_unlock(4242)`; }
+}
+async function saveLocked(ids: number[], text: string) {
   const { rounds, excluded } = parseReply(text);
   const fx = await usdRates();
   const items = await sql`select id, url, title, published_at, channel, meta from wgf.raw_items where id = any(${ids})`;
@@ -443,11 +448,12 @@ async function save(ids: number[], text: string) {
                        order by updated_at desc limit 1`;
     }
     if (!co && amountUsd) {
-      // Same amount (within 2%), same stage and country, within 3 days: one round under two translated names
+      // Same amount (within 2%), same stage and country, within 3 days: one round under two translated names.
+      // From $5M up the amount alone is distinctive enough, since articles disagree on headquarters (US vs Canada).
       [co] = await sql`select r.company_id as id from wgf.rounds r join wgf.companies c on c.id = r.company_id
                        where r.status <> 'superseded' and r.amount_usd between ${amountUsd * 0.98} and ${amountUsd * 1.02}
                          and r.stage = ${stage} and abs(r.announced_on - ${announced}::date) <= 3
-                         and (c.hq_country is null or ${country}::text is null or c.hq_country = ${country})
+                         and (c.hq_country is null or ${country}::text is null or c.hq_country = ${country} or ${amountUsd} >= 5000000)
                        order by r.created_at limit 1`;
     }
     const cs = (r.company_socials ?? {}) as Record<string, unknown>;
