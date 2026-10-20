@@ -1,7 +1,7 @@
 import { workflow, node, trigger, expr } from '@n8n/workflow-sdk';
 
 // What Got Funded — earliest-wire check retry. Re-runs the Google check for rounds still waiting (pending_check),
-// for example when the 10pm search finished after the extract read its results. 11:30pm and 4am Sydney, or on demand.
+// for example when the 10pm search finished after the extract read its results. 11:30pm and 4:30am Sydney, or on demand.
 // (Original header of the extract workflow follows.)
 // What Got Funded — daily extraction, 10pm Sydney (the crawl starts at 9pm in wgf-daily-crawl.ts).
 // Loads the latest successful crawl, store articles in Supabase, extract each article with Claude Haiku (translation included),
@@ -38,6 +38,26 @@ const sydneyHours = node({
   },
 });
 const runNow = trigger({ type: 'n8n-nodes-base.manualTrigger', version: 1, config: { name: 'Run now' } });
+// On demand from outside n8n: POST /webhook/wgf-wire-check with the x-wgf-token header
+const hook = trigger({
+  type: 'n8n-nodes-base.webhook',
+  version: 2,
+  config: { name: 'Run on request', parameters: { httpMethod: 'POST', path: 'wgf-wire-check', responseMode: 'onReceived', options: {} } },
+});
+const tokenOk = node({
+  type: 'n8n-nodes-base.filter',
+  version: 2.2,
+  config: {
+    name: 'Token matches',
+    parameters: {
+      conditions: {
+        options: { caseSensitive: true, leftValue: '', typeValidation: 'loose' },
+        conditions: [{ leftValue: expr("{{ $json.headers['x-wgf-token'] }}"), rightValue: TOKEN, operator: { type: 'string', operation: 'equals' } }],
+        combinator: 'and',
+      },
+    },
+  },
+});
 const anyWaiting = node({
   type: 'n8n-nodes-base.filter',
   version: 2.2,
@@ -152,4 +172,7 @@ export default workflow('wgf-wire-check', 'WGF — Wire check retry (11:30pm, 4:
   .to(matchDomains)
   .to(saveDomains)
   .add(runNow)
+  .to(targets)
+  .add(hook)
+  .to(tokenOk)
   .to(targets);
