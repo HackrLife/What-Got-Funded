@@ -162,8 +162,8 @@ const saveDomains = node({
 });
 
 export default workflow('wgf-wire-check', 'WGF — Wire check retry (11:30pm, 4:30am)')
-  .add(schedule)
-  .to(sydneyHours)
+  .add(hook)
+  .to(tokenOk)
   .to(targets)
   .to(anyWaiting)
   .to(findDomains)
@@ -171,8 +171,8 @@ export default workflow('wgf-wire-check', 'WGF — Wire check retry (11:30pm, 4:
   .to(getSearch)
   .to(matchDomains)
   .to(saveDomains)
-  .add(runNow)
+  .add(schedule)
+  .to(sydneyHours)
   .to(targets)
-  .add(hook)
-  .to(tokenOk)
+  .add(runNow)
   .to(targets);
