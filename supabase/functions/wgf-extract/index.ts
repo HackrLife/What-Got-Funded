@@ -238,6 +238,9 @@ function resultDate(r: Record<string, unknown>, now = Date.now()): { d: string; 
     const n = Number(ago[1]), unit = ago[2].startsWith("day") ? 864e5 : ago[2].startsWith("week") ? 7 * 864e5 : 0;
     return { d: new Date(now - n * unit).toISOString().slice(0, 10), abs: false };
   }
+  // The scraper's own date field: a plain date (stored at 12:00:00.000Z) is absolute; a timestamp was derived from "N hours/days ago"
+  const iso = String(r.date ?? "");
+  if (/^\d{4}-\d{2}-\d{2}T/.test(iso)) return { d: iso.slice(0, 10), abs: /T12:00:00\.000Z$/.test(iso) };
   return null;
 }
 type Round = { day: string; stage: string; amount_usd: number | null; name: string; name_native: string | null };

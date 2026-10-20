@@ -185,7 +185,7 @@ const findDomains = node({
 const waitSearch = node({
   type: 'n8n-nodes-base.wait',
   version: 1.1,
-  config: { name: 'Wait for search', parameters: { resume: 'timeInterval', amount: 10, unit: 'minutes' } },
+  config: { name: 'Wait for search', parameters: { resume: 'timeInterval', amount: 25, unit: 'minutes' } },
 });
 
 const getSearch = node({
