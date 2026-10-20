@@ -431,10 +431,21 @@ async function save(ids: number[], text: string) {
     // company: domain first, then name (+ country when both known)
     let [co] = domain ? await sql`select id from wgf.companies where domain = ${domain}` : [];
     if (!co) {
+      // name in English or original script, either side; the original-script name is the most stable key across translations
       [co] = await sql`select id from wgf.companies
-                       where (name_key = wgf.name_key(${company}) or (${native}::text is not null and name_key = wgf.name_key(${native})))
+                       where (name_key = wgf.name_key(${company})
+                              or (${native}::text is not null and (name_key = wgf.name_key(${native}) or wgf.name_key(name_native) = wgf.name_key(${native})
+                                  or (length(${native}::text) >= 4 and name_native is not null and (strpos(name_native, ${native}::text) = 1 or strpos(${native}::text, name_native) = 1)))))
                          and (hq_country is null or ${country}::text is null or hq_country = ${country})
                        order by updated_at desc limit 1`;
+    }
+    if (!co && amountUsd) {
+      // Same amount (within 2%), same stage and country, within 3 days: one round under two translated names
+      [co] = await sql`select r.company_id as id from wgf.rounds r join wgf.companies c on c.id = r.company_id
+                       where r.status <> 'superseded' and r.amount_usd between ${amountUsd * 0.98} and ${amountUsd * 1.02}
+                         and r.stage = ${stage} and abs(r.announced_on - ${announced}::date) <= 3
+                         and (c.hq_country is null or ${country}::text is null or c.hq_country = ${country})
+                       order by r.created_at limit 1`;
     }
     const cs = (r.company_socials ?? {}) as Record<string, unknown>;
     const socialUrl = (v: unknown, host: RegExp) => { const u = str(v, 300); return u && host.test(u) ? u.split("?")[0] : null; };
