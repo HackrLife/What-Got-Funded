@@ -235,7 +235,7 @@ const saveDomains = node({
       method: 'POST', url: FN, sendHeaders: true, headerParameters: headers,
       sendBody: true, contentType: 'json', specifyBody: 'json',
       jsonBody: expr('{{ JSON.stringify({ mode: "company_domains", items: $json.items, wire: $json.wire }) }}'),
-      options: { timeout: 120000, ...lenient },
+      options: { timeout: 300000, ...lenient },
     },
   },
 });
