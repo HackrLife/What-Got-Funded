@@ -512,12 +512,16 @@ const isTest = ifElse({
 const scorePipeline = verifyCall('Score: whole verifier', '{{ JSON.stringify({ mode: "score", checker: "pipeline" }) }}');
 const scoreGemini = verifyCall('Score: Gemini alone', '{{ JSON.stringify({ mode: "score", checker: "gemini" }) }}');
 
-sticky('## Agent 1 · Scraper\nApify crawler over ~300 sources for yesterday in Sydney (or the Run-now target_date).', [startCrawl, waitCrawl, crawlDone], { color: 4 });
-sticky('## Agent 2 · Structurer\nStores articles, extracts each round as JSON (Claude Haiku), finds and reads company websites.',
+sticky(`## Agent 1 · Scraper
+Apify crawler over ~300 sources for yesterday in Sydney (or the Run-now target_date).`, [startCrawl, waitCrawl, crawlDone], { color: 4 });
+sticky(`## Agent 2 · Structurer
+Stores articles, extracts each round as JSON (Claude Haiku), finds and reads company websites.`,
   [getArticles, chunkArticles, ingest, plan, split, buildPrompt, claude, saveRounds, targets, findDomains, waitSearch, getSearch, matchDomains, saveDomains, recheck, hasDomains, readSites, collectSites, saveSites], { color: 5 });
-sticky('## Agent 3 · Verifier\nGemini Flash + Google Search checks each round was first announced on the day. Big or unclear rounds get a Claude Sonnet second opinion. Test mode scores it on the hand-checked gold set.',
+sticky(`## Agent 3 · Verifier
+Gemini Flash + Google Search checks each round was first announced on the day. Big or unclear rounds get a Claude Sonnet second opinion. Test mode scores it on the hand-checked gold set.`,
   [geminiTargets, geminiSplit, anyGemini, gemini, saveGemini, claudeTargets, claudeSplit, anyClaude, claudeCheck, saveClaude, verified, isTest, scorePipeline, scoreGemini], { color: 6 });
-sticky('## Settings\nRun now: edit "Run-now settings" (target_date, run = full | verify_only | verifier_test). The 9pm Sydney run always does a full run for yesterday.', [runNow, runSettings, schedule, is9pm, nightly, route], { color: 7 });
+sticky(`## Settings
+Run now: edit "Run-now settings" (target_date, run = full | verify_only | verifier_test). The 9pm Sydney run always does a full run for yesterday.`, [runNow, runSettings, schedule, is9pm, nightly, route], { color: 7 });
 
 export default workflow('wgf-daily', 'WGF — Daily pipeline (9pm)')
   .add(runNow)
