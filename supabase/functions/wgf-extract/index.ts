@@ -140,7 +140,7 @@ Reply with JSON only:
     `Article id: ${Number(item.id)}`,
     `Source: ${item.source ?? meta.source ?? ""} (${item.market ?? meta.market ?? ""}), language: ${meta.page_language ?? meta.source_language ?? "unknown"}`,
     `Published: ${item.published_at ? new Date(item.published_at as string).toISOString().slice(0, 10) : "unknown"}`,
-    `Target day (the day this edition covers): ${meta.target_date ?? "unknown"}. Scraped on: ${new Date().toISOString().slice(0, 10)}.`,
+    `Scraped on: ${new Date().toISOString().slice(0, 10)}.`,
     `Headline: ${item.title ?? ""}`,
     `URL: ${item.url}`,
     "",

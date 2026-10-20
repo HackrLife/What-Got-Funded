@@ -1,11 +1,15 @@
-import { workflow, node, trigger, expr } from '@n8n/workflow-sdk';
+import { workflow, node, trigger, expr, ifElse, switchCase, sticky } from '@n8n/workflow-sdk';
 
 // What Got Funded — the one daily n8n workflow, 9pm Sydney.
 //   Agent 1, Scraper: starts the Apify crawler for yesterday-in-Sydney and waits for it.
 //   Agent 2, Structurer: stores the articles and extracts each round as JSON (model call), then finds company websites
 //            and reads them for socials and careers pages.
-// New rounds are left as pending_check. Agents 3–6 (Verifier, Curator, Article publisher, Newsletter publisher) run in the
-// nightly scheduled Claude task, which reads pending_check rounds from Supabase.
+//   Agent 3, Verifier: Gemini Flash with Google Search checks every new round's first announcement date; rounds it cannot
+//            settle (large, unclear, not found) get a second opinion from Claude Sonnet with web search.
+//            Run-now setting "verifier_test" runs it in dry-run mode over the hand-checked gold set and scores it.
+// Agents 4–6 (Curator, Article publisher, Newsletter publisher) still run in the nightly scheduled Claude task until the
+// verifier scores at least 95% on the gold set.
+// Run now: edit the "Run-now settings" box (target_date, run = full | verify_only | verifier_test), then execute.
 // The x-wgf-token value lives only in n8n; this export uses a placeholder.
 const FN = 'https://cxtcwslqzrzjaulqcvvu.supabase.co/functions/v1/wgf-extract';
 const TOKEN = '__WGF_TOKEN__';
@@ -41,6 +45,39 @@ const is9pm = node({
 });
 const runNow = trigger({ type: 'n8n-nodes-base.manualTrigger', version: 1, config: { name: 'Run now' } });
 
+const setting = (id, name, value) => ({ id, name, value, type: 'string' });
+const nightly = node({
+  type: 'n8n-nodes-base.set',
+  version: 3.4,
+  config: {
+    name: 'Nightly settings',
+    parameters: { mode: 'manual', includeOtherFields: false, assignments: { assignments: [setting('n-date', 'target_date', ''), setting('n-run', 'run', 'full')] } },
+  },
+});
+// Edit these two values before a manual run. target_date: YYYY-MM-DD, empty = yesterday in Sydney.
+// run: full (crawl + structure + verify), verify_only (verify rounds already stored), verifier_test (score on the gold set).
+const runSettings = node({
+  type: 'n8n-nodes-base.set',
+  version: 3.4,
+  config: {
+    name: 'Run-now settings',
+    parameters: { mode: 'manual', includeOtherFields: false, assignments: { assignments: [setting('r-date', 'target_date', ''), setting('r-run', 'run', 'full')] } },
+  },
+});
+const rule = (key) => ({
+  outputKey: key,
+  conditions: {
+    options: { caseSensitive: true, leftValue: '', typeValidation: 'strict' },
+    conditions: [{ leftValue: expr('{{ $json.run }}'), operator: { type: 'string', operation: 'equals' }, rightValue: key }],
+    combinator: 'and',
+  },
+});
+const route = switchCase({
+  version: 3.2,
+  config: { name: 'What to run', parameters: { rules: { values: [rule('full'), rule('verify_only'), rule('verifier_test')] } } },
+});
+const RUN = "$('What to run').first().json.run";
+
 // ---------- Agent 1: Scraper ----------
 const startCrawl = node({
   type: 'n8n-nodes-base.httpRequest',
@@ -50,7 +87,8 @@ const startCrawl = node({
     retryOnFail: true, maxTries: 3, waitBetweenTries: 5000,
     parameters: {
       method: 'POST', url: `${ACTOR}/runs?memory=2048&timeout=3300`, ...apify,
-      sendBody: true, contentType: 'json', specifyBody: 'json', jsonBody: '{ "mode": "articles" }',
+      sendBody: true, contentType: 'json', specifyBody: 'json',
+      jsonBody: expr('{{ JSON.stringify(Object.assign({ mode: "articles" }, $json.target_date ? { targetDate: $json.target_date } : {})) }}'),
       options: { timeout: 60000, response: { response: { responseFormat: 'json' } } },
     },
     credentials: apifyCred,
@@ -348,10 +386,151 @@ const saveSites = node({
   },
 });
 
+// ---------- Agent 3: Verifier ----------
+const VERIFY = 'https://cxtcwslqzrzjaulqcvvu.supabase.co/functions/v1/wgf-verify';
+const verifyCall = (name, body, extra = {}) => node({
+  type: 'n8n-nodes-base.httpRequest',
+  version: 4.4,
+  config: {
+    name, executeOnce: true, ...extra,
+    parameters: {
+      method: 'POST', url: VERIFY, sendHeaders: true, headerParameters: headers,
+      sendBody: true, contentType: 'json', specifyBody: 'json', jsonBody: expr(body),
+      options: { timeout: 120000, ...lenient },
+    },
+  },
+});
+const splitCode = (name) => node({
+  type: 'n8n-nodes-base.code',
+  version: 2,
+  config: {
+    name,
+    parameters: { mode: 'runOnceForAllItems', jsCode: `const items = $input.first().json.items || [];
+return items.length ? items.map(i => ({ json: i })) : [{ json: { none: true } }];` },
+  },
+});
+const anyRounds = (name) => ifElse({
+  version: 2.2,
+  config: {
+    name,
+    parameters: {
+      conditions: {
+        options: { caseSensitive: true, leftValue: '', typeValidation: 'loose' },
+        conditions: [{ leftValue: expr('{{ $json.round_id }}'), operator: { type: 'number', operation: 'exists', singleValue: true } }],
+        combinator: 'and',
+      },
+    },
+  },
+});
+
+const geminiTargets = verifyCall('Rounds to verify',
+  `{{ JSON.stringify(${RUN} === "verifier_test" ? { mode: "targets", checker: "gemini", gold: true } : { mode: "targets", checker: "gemini" }) }}`);
+const geminiSplit = splitCode('One Gemini request per round');
+const anyGemini = anyRounds('Any rounds to verify');
+const gemini = node({
+  type: 'n8n-nodes-base.httpRequest',
+  version: 4.4,
+  config: {
+    name: 'Gemini + Google Search',
+    parameters: {
+      method: 'POST', url: expr('{{ $json.url }}'),
+      authentication: 'genericCredentialType', genericAuthType: 'httpHeaderAuth',
+      sendBody: true, contentType: 'json', specifyBody: 'json', jsonBody: expr('{{ JSON.stringify($json.body) }}'),
+      options: { timeout: 120000, batching: { batch: { batchSize: 4, batchInterval: 2000 } }, ...lenient },
+    },
+    credentials: { httpHeaderAuth: { id: 'EEJ8SC9KxO1weHL3', name: 'Header Auth account 2' } },
+  },
+});
+const saveGemini = node({
+  type: 'n8n-nodes-base.httpRequest',
+  version: 4.4,
+  config: {
+    name: 'Save Gemini verdict',
+    onError: 'continueRegularOutput', retryOnFail: true, maxTries: 3, waitBetweenTries: 3000,
+    parameters: {
+      method: 'POST', url: VERIFY, sendHeaders: true, headerParameters: headers,
+      sendBody: true, contentType: 'json', specifyBody: 'json',
+      jsonBody: expr(`{{ JSON.stringify((r => ({ mode: "save", checker: "gemini", round_id: r.round_id, day: r.day, model: r.model, dry_run: r.dry_run,
+        reply: $json.candidates ? { candidates: [{ content: $json.candidates[0].content }] } : JSON.stringify($json.error || $json) }))($('One Gemini request per round').item.json)) }}`),
+      options: { timeout: 60000, batching: { batch: { batchSize: 1, batchInterval: 200 } }, ...lenient },
+    },
+  },
+});
+
+const claudeTargets = verifyCall('Second opinions',
+  `{{ JSON.stringify(${RUN} === "verifier_test" ? { mode: "targets", checker: "claude", gold: true } : { mode: "targets", checker: "claude" }) }}`);
+const claudeSplit = splitCode('One Claude request per round');
+const anyClaude = anyRounds('Any second opinions');
+const claudeCheck = node({
+  type: 'n8n-nodes-base.httpRequest',
+  version: 4.4,
+  config: {
+    name: 'Claude + web search',
+    parameters: {
+      method: 'POST', url: expr('{{ $json.url }}'),
+      authentication: 'predefinedCredentialType', nodeCredentialType: 'anthropicApi',
+      sendHeaders: true, headerParameters: { parameters: [{ name: 'anthropic-version', value: '2023-06-01' }] },
+      sendBody: true, contentType: 'json', specifyBody: 'json', jsonBody: expr('{{ JSON.stringify($json.body) }}'),
+      options: { timeout: 300000, batching: { batch: { batchSize: 2, batchInterval: 5000 } }, ...lenient },
+    },
+    credentials: { anthropicApi: { id: 'Jxsbr4056cWcup7u', name: 'Anthropic account' } },
+  },
+});
+const saveClaude = node({
+  type: 'n8n-nodes-base.httpRequest',
+  version: 4.4,
+  config: {
+    name: 'Save Claude verdict',
+    onError: 'continueRegularOutput', retryOnFail: true, maxTries: 3, waitBetweenTries: 3000,
+    parameters: {
+      method: 'POST', url: VERIFY, sendHeaders: true, headerParameters: headers,
+      sendBody: true, contentType: 'json', specifyBody: 'json',
+      jsonBody: expr(`{{ JSON.stringify((r => ({ mode: "save", checker: "claude", round_id: r.round_id, day: r.day, model: r.model, dry_run: r.dry_run,
+        reply: Array.isArray($json.content) ? { content: $json.content.filter(b => b.type === "text") } : JSON.stringify($json.error || $json) }))($('One Claude request per round').item.json)) }}`),
+      options: { timeout: 60000, batching: { batch: { batchSize: 1, batchInterval: 200 } }, ...lenient },
+    },
+  },
+});
+const verified = node({
+  type: 'n8n-nodes-base.code',
+  version: 2,
+  config: { name: 'Verifier done', parameters: { mode: 'runOnceForAllItems', jsCode: `return [{ json: { checked: $input.all().filter(i => i.json.round_id).length } }];` } },
+});
+const isTest = ifElse({
+  version: 2.2,
+  config: {
+    name: 'Test run?',
+    parameters: {
+      conditions: {
+        options: { caseSensitive: true, leftValue: '', typeValidation: 'strict' },
+        conditions: [{ leftValue: expr(`{{ ${RUN} }}`), operator: { type: 'string', operation: 'equals' }, rightValue: 'verifier_test' }],
+        combinator: 'and',
+      },
+    },
+  },
+});
+const scorePipeline = verifyCall('Score: whole verifier', '{{ JSON.stringify({ mode: "score", checker: "pipeline" }) }}');
+const scoreGemini = verifyCall('Score: Gemini alone', '{{ JSON.stringify({ mode: "score", checker: "gemini" }) }}');
+
+sticky('## Agent 1 · Scraper\nApify crawler over ~300 sources for yesterday in Sydney (or the Run-now target_date).', [startCrawl, waitCrawl, crawlDone], { color: 4 });
+sticky('## Agent 2 · Structurer\nStores articles, extracts each round as JSON (Claude Haiku), finds and reads company websites.',
+  [getArticles, chunkArticles, ingest, plan, split, buildPrompt, claude, saveRounds, targets, findDomains, waitSearch, getSearch, matchDomains, saveDomains, recheck, hasDomains, readSites, collectSites, saveSites], { color: 5 });
+sticky('## Agent 3 · Verifier\nGemini Flash + Google Search checks each round was first announced on the day. Big or unclear rounds get a Claude Sonnet second opinion. Test mode scores it on the hand-checked gold set.',
+  [geminiTargets, geminiSplit, anyGemini, gemini, saveGemini, claudeTargets, claudeSplit, anyClaude, claudeCheck, saveClaude, verified, isTest, scorePipeline, scoreGemini], { color: 6 });
+sticky('## Settings\nRun now: edit "Run-now settings" (target_date, run = full | verify_only | verifier_test). The 9pm Sydney run always does a full run for yesterday.', [runNow, runSettings, schedule, is9pm, nightly, route], { color: 7 });
+
 export default workflow('wgf-daily', 'WGF — Daily pipeline (9pm)')
+  .add(runNow)
+  .to(runSettings)
+  .to(route
+    .onCase('full', startCrawl)
+    .onCase('verify_only', geminiTargets)
+    .onCase('verifier_test', geminiTargets))
   .add(schedule)
   .to(is9pm)
-  .to(startCrawl)
+  .to(nightly)
+  .to(route)
+  .add(startCrawl)
   .to(waitCrawl)
   .to(crawlDone)
   .to(getArticles)
@@ -362,6 +541,8 @@ export default workflow('wgf-daily', 'WGF — Daily pipeline (9pm)')
   .to(buildPrompt)
   .to(claude)
   .to(saveRounds)
+  .to(geminiTargets)
+  .add(saveRounds)
   .to(targets)
   .to(findDomains)
   .to(waitSearch)
@@ -373,5 +554,15 @@ export default workflow('wgf-daily', 'WGF — Daily pipeline (9pm)')
   .to(readSites)
   .to(collectSites)
   .to(saveSites)
-  .add(runNow)
-  .to(startCrawl);
+  .add(geminiTargets)
+  .to(geminiSplit)
+  .to(anyGemini
+    .onTrue(gemini.to(saveGemini.to(claudeTargets)))
+    .onFalse(claudeTargets))
+  .add(claudeTargets)
+  .to(claudeSplit)
+  .to(anyClaude
+    .onTrue(claudeCheck.to(saveClaude.to(verified)))
+    .onFalse(verified))
+  .add(verified)
+  .to(isTest.onTrue(scorePipeline.to(scoreGemini)));
