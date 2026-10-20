@@ -15,7 +15,16 @@ What Got Funded curates startup funding news and analyses it. Every round comes 
 | 5am | Site rebuild with the new daily article; Beehiiv newsletter draft created. |
 | 6–7am | Newsletter sent. |
 
-A day's edition contains only rounds **announced on that day**. Recaps, background mentions of older rounds, debt, grants, IPOs, M&A, fund closes and rumours are excluded.
+A day's edition contains only rounds **first publicly announced on that day** ("Announced", never "Closed"). Recaps, re-posts of older rounds, background mentions, debt, grants, IPOs, M&A, fund closes and rumours are excluded.
+
+## Date verification (every run)
+"Funded date" means the **first public announcement date**, in the publisher's local time. Four checks, in order:
+1. **Anchored extraction.** Each article is read with its publish date and the target day. Each round gets `temporal_phrase_exact`, `temporal_category` (FRESH_ANNOUNCEMENT, RECENT_SYNDICATION, HISTORICAL_REFERENCE, SEC_FILING_ONLY), `inferred_announcement_date` and `date_confidence_score`. HISTORICAL_REFERENCE is discarded; SEC_FILING_ONLY and confidence below 0.5 are held as `unverified`; a first announcement before the target day is `missed_window`.
+2. **Source tiers.** Wires and primary press can establish a date. Re-publishers and aggregators (Dealroom News, TheSaaSNews, Startupresearcher, Fundz, ValueAddVC, Startuprise, AIWeekly and similar) can confirm a round but never create one on their own: rounds known only from them are `unverified`.
+3. **Earliest-wire check.** Every new round waits as `pending_check` until one Google search (Apify Google Search Scraper, English results) looks for reports of the same round dated in the 90 days before its announcement day. The company must be in a result's title, with its amount or stage. One result with an absolute earlier date, or two sites with relative dates two or more days earlier, makes it `missed_window` (with `earliest_web_date` and `earliest_web_url`). Otherwise it goes `live`. Database pages and social posts are not evidence.
+4. **90-day lookback.** A new article about a company with a compatible round (same or unstated stage, amount within 20%) in the last 90 days is added to that round as a source; the round keeps its first announcement date. The same round under two translated names is matched by original-script name, or by the same amount, stage and country within 3 days.
+
+Each round on the site and in the email shows "Announced <date>" and its first source with that source's own date.
 
 ## Formats
 

@@ -6,6 +6,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { CONTINENTS, continentOf, countryLabel } from "./src/regions.mjs";
 import { editionModel, charts, startupFacts, usd, NEWSLETTER_MAX } from "./src/edition.mjs";
+const shortDay = (iso) => new Date(iso + "T12:00:00Z").toLocaleDateString("en-GB", { day: "numeric", month: "short", timeZone: "UTC" });
 
 const ROOT = path.dirname(fileURLToPath(import.meta.url));
 const SITE_URL = (process.env.SITE_URL || "https://whatgotfunded.com").replace(/\/$/, "");
@@ -54,7 +55,12 @@ function startup(r) {
     r.investors.length ? `<p><strong>${r.leads.length ? "Also investing" : "Investors"}:</strong> ${esc(r.investors.join(", "))}</p>` : "",
     founders ? `<p><strong>Founders:</strong> ${founders}</p>` : "",
     co ? `<p><strong>Company:</strong> ${co}</p>` : "",
-    r.sources[0] ? `<p>Source: ${a(r.sources[0].url, /^google news/i.test(r.sources[0].source || "") ? "Google News" : (r.sources[0].source || "article"))}</p>` : "",
+    (() => {
+      const s = [...r.sources].filter((x) => x.url && !/news\.google\.com/.test(x.url)).sort((p, q) => String(p.published_at || "9").localeCompare(String(q.published_at || "9")))[0] || r.sources[0];
+      if (!s) return "";
+      const when = s.published_at ? ` (${shortDay(String(s.published_at).slice(0, 10))})` : "";
+      return `<p>Announced ${shortDay(r.announced_on)}. First reported by ${a(s.url, /^google news/i.test(s.source || "") ? "Google News" : (s.source || "article"))}${esc(when)}</p>`;
+    })(),
   ].filter(Boolean).join("");
   return card(`<h3>${a(r.href, r.company)}</h3>${lines}`);
 }

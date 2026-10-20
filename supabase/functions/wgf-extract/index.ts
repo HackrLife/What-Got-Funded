@@ -35,6 +35,7 @@ const SECTORS = [
   "Consumer & retail", "Food & agriculture", "Real estate & construction", "Logistics & supply chain", "Education", "HR & work",
   "Media & entertainment", "Gaming", "Travel & hospitality", "Web3 & crypto", "Other",
 ];
+const TEMPORAL = ["FRESH_ANNOUNCEMENT", "RECENT_SYNDICATION", "HISTORICAL_REFERENCE", "SEC_FILING_ONLY"];
 const EXCLUDE_REASONS = ["not_funding", "debt", "grant", "fund_close", "ipo_or_public", "m_and_a", "secondary", "private_equity", "duplicate_listing", "rumour", "recap", "other"];
 // Company names that are descriptions, not names ("an undisclosed AI startup")
 const NON_LATIN = /[\u3040-\u30ff\u3400-\u9fff\uac00-\ud7af\u0600-\u06ff\u0400-\u04ff\u0590-\u05ff\u0e00-\u0e7f]/;
@@ -118,11 +119,19 @@ Rules:
 - hq_city, hq_country: the company's base, in English, if stated or clear (e.g. "Bengaluru-based").
 - description: one plain sentence on what the company does. unique: one sentence on what is distinctive about the company or this round, only if the article supports it, else null. summary: two or three sentences for a newsletter entry covering what the company does, the round and what the money is for, using only facts in the article.
 - use_of_funds: what the money is for, if stated, else null.
-- announced_on: YYYY-MM-DD of the day the round was announced. Resolve relative wording against the publish date ("today" = publish date, "yesterday" = the day before, "on Tuesday" = the most recent Tuesday on or before the publish date). If the article reports the raise as fresh news with no other date, use the publish date. If it is clearly a follow-up to an announcement made on an earlier unstated day ("last week", "recently", "earlier this month"), use null and set fresh to false.
-- fresh: true if this article is reporting the announcement itself (published on the day of the announcement or the day after), false if it covers a round announced earlier.
+- Dates. "Funded date" means the first public announcement of the round. Use the article's publish date and the target day given below as anchors, and classify how the article talks about the round:
+  - temporal_phrase_exact: the exact words (in the original language) that place the round in time, e.g. "announced today that it has raised", "宣布完成", "earlier this week", "having raised $10M in May". null if there are none.
+  - temporal_category, one of:
+    FRESH_ANNOUNCEMENT: the article is the announcement or reports it as just announced ("announces", "today", "has raised", "secures", "closes", a press-release dateline from the last 24-48 hours).
+    RECENT_SYNDICATION: the article re-reports a round announced on a specific earlier day within the last 7 days ("earlier this week", "on Tuesday", "last Thursday").
+    HISTORICAL_REFERENCE: the round is background inside another story, or older than 7 days ("raised in May", "following its Series A last year", "recently raised", periodic recaps and rankings).
+    SEC_FILING_ONLY: the only basis is a regulatory filing (SEC Form D, company registry change, 工商变更) with no announcement by the company or investors.
+  - inferred_announcement_date: YYYY-MM-DD of the first public announcement. Resolve relative words against the publish date ("today" = publish date, "yesterday" = the day before, "on Tuesday" = the most recent Tuesday on or before the publish date). For FRESH_ANNOUNCEMENT with no other date, the publish date. null if it cannot be worked out.
+  - date_confidence_score: 0 to 1, how sure you are of inferred_announcement_date.
+  Do not extract HISTORICAL_REFERENCE rounds; if nothing else remains, put the article in excluded with reason "recap".
 
 Reply with JSON only:
-{"rounds":[{"item_ids":[${Number(item.id)}],"company":"","company_native":null,"domain":null,"company_socials":{"linkedin":null,"x":null},"hq_city":null,"hq_country":null,"sector":"","stage":"","amount":null,"currency":null,"amount_usd_stated":null,"amount_text":null,"lead_investors":[],"investors":[],"founders":[{"name":"","role":"","linkedin":null,"x":null}],"description":"","unique":null,"use_of_funds":null,"summary":"","announced_on":null,"fresh":true}],"excluded":[{"id":${Number(item.id)},"reason":"not_funding"}]}`;
+{"rounds":[{"item_ids":[${Number(item.id)}],"company":"","company_native":null,"domain":null,"company_socials":{"linkedin":null,"x":null},"hq_city":null,"hq_country":null,"sector":"","stage":"","amount":null,"currency":null,"amount_usd_stated":null,"amount_text":null,"lead_investors":[],"investors":[],"founders":[{"name":"","role":"","linkedin":null,"x":null}],"description":"","unique":null,"use_of_funds":null,"summary":"","temporal_phrase_exact":null,"temporal_category":"FRESH_ANNOUNCEMENT","inferred_announcement_date":null,"date_confidence_score":0.9}],"excluded":[{"id":${Number(item.id)},"reason":"not_funding"}]}`;
   const links = [
     ...((meta.outbound as { domain: string; anchor: string }[]) ?? []).map((o) => `${o.domain} — "${o.anchor}"`),
     ...((meta.socials as string[]) ?? []),
@@ -131,6 +140,7 @@ Reply with JSON only:
     `Article id: ${Number(item.id)}`,
     `Source: ${item.source ?? meta.source ?? ""} (${item.market ?? meta.market ?? ""}), language: ${meta.page_language ?? meta.source_language ?? "unknown"}`,
     `Published: ${item.published_at ? new Date(item.published_at as string).toISOString().slice(0, 10) : "unknown"}`,
+    `Target day (the day this edition covers): ${meta.target_date ?? "unknown"}. Scraped on: ${new Date().toISOString().slice(0, 10)}.`,
     `Headline: ${item.title ?? ""}`,
     `URL: ${item.url}`,
     "",
@@ -181,8 +191,14 @@ async function companyTargets(body: Record<string, unknown>) {
                               and exists (select 1 from wgf.round_profiles rp where rp.round_id = r.id and rp.method = 'pipeline')
                               and c.name !~* '(unnamed|undisclosed|stealth)'
                             group by c.id, c.name, c.hq_country order by seen desc limit 150`;
+  // Earliest-wire check: rounds waiting for confirmation that this is their first public announcement
+  const pending = await sql`select r.id, r.announced_on::text as day, r.stage, c.name, c.name_native
+                            from wgf.rounds r join wgf.companies c on c.id = r.company_id
+                            where r.status = 'pending_check' and r.created_at > now() - interval '3 days'
+                            order by r.created_at desc limit 300`;
   return {
     domains: rows.map((r) => r.domain),
+    wire: pending.map((p) => ({ round_id: Number(p.id), query: wireQuery(p.name, p.name_native, p.day) })),
     need_domain: missing.map((m) => ({ id: Number(m.id), name: m.name, query: `${m.name} ${m.hq_country ?? ""} startup official website`.replace(/\s+/g, " ").trim() })),
   };
 }
@@ -192,7 +208,90 @@ const NOT_OWN_SITE = /(^|\.)(linkedin|facebook|twitter|x|instagram|youtube|wikip
 const tokens = (s: string) => s.toLowerCase().normalize("NFKD").replace(/[^a-z0-9 ]/g, " ").split(/\s+/)
   .filter((t) => t.length > 2 && !["inc", "ltd", "llc", "the", "labs", "lab", "technologies", "technology", "tech", "group", "gmbh", "corp", "company", "co"].includes(t));
 
+// ---------- earliest-wire check ----------
+// One Google search per new round for reports of it dated before its announcement day (after:/before: operators).
+// Any earlier report of the same round means it is an echo of older news: status missed_window.
+const addDaysIso = (iso: string, n: number) => { const d = new Date(iso + "T12:00:00Z"); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10); };
+function wireQuery(name: string, native: string | null, day: string) {
+  const who = native && NON_LATIN.test(native) ? `("${name}" OR "${native}")` : `"${name}"`;
+  return `${who} (raises OR raised OR funding OR secures OR "led by" OR investment OR 融资 OR 资金調達 OR 투자) after:${addDaysIso(day, -90)} before:${day}`;
+}
+// Sources that only re-publish other outlets' news: they can confirm a round but never establish it on their own
+const TIER3 = /(^|\.)(dealroom\.co|thesaasnews\.com|startupresearcher\.com|fundz\.net|valueaddvc\.com|startuprise\.co\.uk|aiweekly\.co|dnyuz\.com|raising\.fi|startupintros\.com|seedtable\.com|angelinvestorsnetwork\.com|alpha-maven\.com|ecosistemastartup\.com|kucoin\.com|rootdata\.com|cryptorank\.io|medium\.com|substack\.com|linkedin\.com|n24\.com\.tr|newsbytesapp\.com|startupmag\.co\.uk|proptechconnect\.com|vcbacked\.co|superscout\.co)$/i;
+// Database and listing pages describe a company's whole history, so they are not evidence of an earlier announcement
+const NOT_EVIDENCE = /(^|\.)(facebook|instagram|x|twitter|youtube|tiktok|crunchbase|pitchbook|tracxn|cbinsights|zoominfo|owler|craft|linkedin|wikipedia|f6s|wellfound|golden|growjo|getlatka|leadiq|rocketreach|signalhire|apollo|clay|vcbacked|seedtable|startupintros|superscout|privco|globaldata)\.[a-z.]+$/i;
+const FUND_WORDS = /rais|fund|secur|invest|led by|round|seed|series|融资|轮|資金調達|투자|levée|finanz|ronda|تمويل/i;
+const STAGE_WORDS: Record<string, RegExp> = {
+  pre_seed: /pre-?seed/i, seed: /\bseed\b|种子|天使|angel/i, series_a: /series a\b|a轮|pre-a/i, series_b: /series b\b|b轮/i,
+  series_c: /series c\b|c轮/i, series_d: /series d\b|d轮/i, series_e: /series e\b|e轮/i, growth: /growth/i, strategic: /strategic|战略/i,
+};
+// Date of a Google result. "Oct 1, 2026 —" snippet prefixes and dates in URLs are absolute; "3 days ago" is relative
+// to the search time and only approximate.
+function resultDate(r: Record<string, unknown>, now = Date.now()): { d: string; abs: boolean } | null {
+  const head = String(r.description ?? "").split(/ [—–] /)[0];
+  const t = head.length < 30 && /20\d{2}/.test(head) ? Date.parse(`${head.replace(/(\d+)\.\s/, "$1 ")} 12:00 UTC`) : NaN;
+  if (Number.isFinite(t)) return { d: new Date(t).toISOString().slice(0, 10), abs: true };
+  const m = /\/(20\d{2})[/-]?(0[1-9]|1[0-2])[/-]?(0[1-9]|[12]\d|3[01])(?:\d{0,10})(?:[/_.-]|$)/.exec(String(r.url ?? ""));
+  if (m) return { d: `${m[1]}-${m[2]}-${m[3]}`, abs: true };
+  const ago = /^(\d+) (minute|minutes|hour|hours|day|days|week|weeks) ago/.exec(head);
+  if (ago) {
+    const n = Number(ago[1]), unit = ago[2].startsWith("day") ? 864e5 : ago[2].startsWith("week") ? 7 * 864e5 : 0;
+    return { d: new Date(now - n * unit).toISOString().slice(0, 10), abs: false };
+  }
+  return null;
+}
+type Round = { day: string; stage: string; amount_usd: number | null; name: string; name_native: string | null };
+// Results that report this same round before its announcement day.
+// Decisive: one result with an absolute date before the day, or two sites whose relative dates fall two or more days before it.
+// Google's before: operator is approximate, so result dates are checked here too.
+export function earlierEvidence(rd: Round, results: Record<string, unknown>[], now = Date.now()) {
+  const flat = (v: unknown) => String(v ?? "").toLowerCase().normalize("NFKD").replace(/[^\p{L}\p{N}]/gu, "");
+  const keys = [rd.name, rd.name_native].filter(Boolean).map(flat).filter((k) => k.length >= 3);
+  const m = rd.amount_usd ? Number(rd.amount_usd) / 1e6 : null;
+  const amountTok = m ? [...new Set([String(+m.toFixed(1)), String(Math.round(m))])].map((x) => new RegExp(`\\b${x.replace(".", "\\.")}\\s?(m|mn|million|百万)\\b`, "i")) : [];
+  const hits = results.map((x) => ({ x, date: resultDate(x, now) })).filter(({ x, date }) => {
+    const url = String(x.url ?? ""), host = cleanDomain(url) ?? "";
+    if (!host || NOT_EVIDENCE.test(host) || /^(data|app)\./.test(host) || /whatgotfunded\.com$/.test(host)) return false;
+    if (/\/(funding-details|companies|company|organization|profile)\//i.test(url)) return false;   // database pages
+    const text = `${x.title ?? ""} ${x.description ?? ""}`;
+    // The company must be in the title: pages whose sidebars list newer headlines carry the name only in the snippet
+    if (!keys.some((k) => flat(x.title).includes(k)) || !FUND_WORDS.test(text)) return false;
+    if (!date || date.d >= rd.day || date.d < addDaysIso(rd.day, -90)) return false;
+    // the same round: its amount or stage appears, or the round has neither to compare
+    return amountTok.some((re) => re.test(text)) || (STAGE_WORDS[rd.stage]?.test(text) ?? false) || (!m && rd.stage === "undisclosed");
+  });
+  const absolute = hits.filter((h) => h.date!.abs);
+  const relative = hits.filter((h) => !h.date!.abs && h.date!.d <= addDaysIso(rd.day, -2));
+  const relHosts = new Set(relative.map((h) => cleanDomain(String(h.x.url))));
+  const decisive = absolute.length ? absolute : relHosts.size >= 2 ? relative : [];
+  return decisive.map((h) => ({ date: h.date!.d, url: String(h.x.url) })).sort((p, q) => p.date.localeCompare(q.date));
+}
+
+async function wireSave(items: { round_id: number; searched: boolean; results: Record<string, unknown>[] }[]) {
+  let live = 0, missed = 0, held = 0;
+  for (const it of items) {
+    if (!it.searched) continue;   // the search did not run: try again next time
+    const [rd] = await sql`select r.id, r.announced_on::text as day, r.stage, r.amount_usd, c.name, c.name_native
+                           from wgf.rounds r join wgf.companies c on c.id = r.company_id where r.id = ${Number(it.round_id)} and r.status = 'pending_check'`;
+    if (!rd) continue;
+    const hits = earlierEvidence(rd as unknown as Round, it.results ?? []);
+    if (hits.length) {
+      await sql`update wgf.rounds set status = 'missed_window', wire_checked_at = now(), earliest_web_date = ${hits[0].date}, earliest_web_url = ${hits[0].url}
+                where id = ${rd.id}`;
+      missed++;
+      continue;
+    }
+    // No earlier report. A round known only from re-publishers still needs a primary source.
+    const srcs = await sql`select url from wgf.round_sources where round_id = ${rd.id}`;
+    const primary = srcs.some((s) => !TIER3.test(cleanDomain(String(s.url)) ?? ""));
+    await sql`update wgf.rounds set status = ${primary ? "live" : "unverified"}, wire_checked_at = now() where id = ${rd.id}`;
+    primary ? live++ : held++;
+  }
+  return { wire_checked: items.length, live, missed_window: missed, held_tier3_only: held };
+}
+
 async function companyDomains(body: Record<string, unknown>) {
+  const wire = Array.isArray(body.wire) ? await wireSave(body.wire as never) : null;
   const items = (Array.isArray(body.items) ? body.items : []) as { id: number; name: string; results: { url: string; title?: string }[] }[];
   let found = 0;
   for (const it of items) {
@@ -216,7 +315,7 @@ async function companyDomains(body: Record<string, unknown>) {
     await sql`update wgf.companies set domain = coalesce(domain, ${pick}), domain_checked_at = now() where id = ${Number(it.id)}`;
     if (pick) found++;
   }
-  return { received: items.length, domains_found: found };
+  return { received: items.length, domains_found: found, wire };
 }
 
 async function companySave(body: Record<string, unknown>) {
@@ -282,10 +381,11 @@ const cleanDomain = (v: unknown) => {
 async function save(ids: number[], text: string) {
   const { rounds, excluded } = parseReply(text);
   const fx = await usdRates();
-  const items = await sql`select id, url, title, published_at, channel from wgf.raw_items where id = any(${ids})`;
+  const items = await sql`select id, url, title, published_at, channel, meta from wgf.raw_items where id = any(${ids})`;
   const byId = new Map(items.map((i) => [Number(i.id), i]));
   const touched = new Set<number>();
   let created = 0, merged = 0;
+  const historical = new Set<number>();
   // Roundup articles (one article naming many rounds) mostly recap older deals: their rounds are held as unverified
   // unless another article in the batch also reports them.
   const perItem = new Map<number, number>();
@@ -296,6 +396,9 @@ async function save(ids: number[], text: string) {
     const itemIds = (Array.isArray(r.item_ids) ? r.item_ids : []).map(Number).filter((i) => byId.has(i));
     const company = str(r.company, 200);
     if (!itemIds.length || !company) continue;
+    // Background mentions of older rounds never become records
+    const tcat = TEMPORAL.includes(String(r.temporal_category)) ? String(r.temporal_category) : null;
+    if (tcat === "HISTORICAL_REFERENCE") { itemIds.forEach((i) => historical.add(i)); continue; }
     const native = str(r.company_native, 200);
     const domain = cleanDomain(r.domain);
     const country = normCountry(str(r.hq_country, 80));
@@ -305,11 +408,25 @@ async function save(ids: number[], text: string) {
     const amount = num(r.amount);
     const amountUsd = num(r.amount_usd_stated) ?? (amount && currency && fx[currency] ? Math.round(amount / fx[currency]) : null);
     const firstPub = itemIds.map((i) => byId.get(i)!.published_at).filter(Boolean).sort()[0] ?? new Date().toISOString();
-    const announced = /^\d{4}-\d{2}-\d{2}$/.test(String(r.announced_on)) ? String(r.announced_on) : String(new Date(firstPub).toISOString()).slice(0, 10);
-    const notFresh = r.fresh === false && !/^\d{4}-\d{2}-\d{2}$/.test(String(r.announced_on));
+    const isDate = (v: unknown) => /^\d{4}-\d{2}-\d{2}$/.test(String(v));
+    const pubDay = String(new Date(firstPub).toISOString()).slice(0, 10);
+    const inferred = isDate(r.inferred_announcement_date) ? String(r.inferred_announcement_date) : isDate(r.announced_on) ? String(r.announced_on) : null;
+    const announced = inferred ?? pubDay;
+    const conf = typeof r.date_confidence_score === "number" ? Math.max(0, Math.min(1, r.date_confidence_score)) : null;
+    const notFresh = r.fresh === false && !inferred;
+    const isArticle = itemIds.some((i) => byId.get(i)!.channel === "article");
+    const target = itemIds.map((i) => String(((byId.get(i)!.meta ?? {}) as Record<string, unknown>).target_date ?? "")).find(isDate) ?? null;
 
+    // Article rounds wait for the earliest-wire check before they are published (see wireSave)
     let status = UNNAMED_COMPANY.test(company) ? "unnamed"
-      : Date.parse(announced) < Date.parse(String(new Date(firstPub).toISOString()).slice(0, 10)) - 30 * 864e5 ? "stale" : "live";
+      : Date.parse(announced) < Date.parse(pubDay) - 30 * 864e5 ? "stale"
+      : isArticle ? "pending_check" : "live";
+    if (status === "pending_check" || status === "live") {
+      if (tcat === "SEC_FILING_ONLY") status = "unverified";
+      else if (conf !== null && conf < 0.5) status = "unverified";
+      // First announced before the day this run covers: that day has passed, so it is not news now
+      else if (target && announced < target) status = "missed_window";
+    }
 
     // company: domain first, then name (+ country when both known)
     let [co] = domain ? await sql`select id from wgf.companies where domain = ${domain}` : [];
@@ -352,19 +469,22 @@ async function save(ids: number[], text: string) {
                        returning id`;
     }
 
-    if (repeat && status === "live") status = "stale";
+    const open = (st: string) => st === "live" || st === "pending_check";
+    if (repeat && open(status)) status = "stale";
     // Every source URL dated to an earlier month than the announcement: an old story re-dated by the page
     const months = itemIds.map((i) => urlMonth(String(byId.get(i)!.url))).filter(Boolean) as string[];
-    if (months.length === itemIds.length && months.every((mo) => mo < announced.slice(0, 7)) && status === "live") status = "stale";
-    if (itemIds.every((i) => (perItem.get(i) ?? 0) >= 4) && status === "live") status = "unverified";
+    if (months.length === itemIds.length && months.every((mo) => mo < announced.slice(0, 7)) && open(status)) status = "stale";
+    if (itemIds.every((i) => (perItem.get(i) ?? 0) >= 4) && open(status)) status = "unverified";
     // Announced on an earlier, unstated day: kept for the record but not counted on the article's day
-    if (notFresh && status === "live") status = "unverified";
-    // round: same company, compatible stage, within 14 days
+    if (notFresh && open(status)) status = "unverified";
+    // 90-day lookback: the same company and a compatible stage and amount is the same round. The new article is
+    // added as a source; the round keeps its first announcement date and status.
     let [rd] = await sql`select id from wgf.rounds
                          where company_id = ${co.id} and status <> 'superseded'
                            and (stage = ${stage} or stage = 'undisclosed' or ${stage} = 'undisclosed')
-                           and abs(coalesce(announced_on, created_at::date) - ${announced}::date) <= 14
-                         order by created_at desc limit 1`;
+                           and (amount_usd is null or ${amountUsd}::numeric is null or amount_usd between ${amountUsd ?? 0} * 0.8 and ${amountUsd ?? 0} * 1.2)
+                           and abs(coalesce(announced_on, created_at::date) - ${announced}::date) <= 90
+                         order by coalesce(announced_on, created_at::date) asc limit 1`;
     if (rd) {
       merged++;
       await sql`update wgf.rounds set
@@ -377,10 +497,11 @@ async function save(ids: number[], text: string) {
     } else {
       created++;
       [rd] = await sql`insert into wgf.rounds (company_id, stage, amount, currency, amount_usd, amount_text, announced_on, week,
-                                               confidence, highlight, summary, headline, edition, status)
+                                               confidence, highlight, summary, headline, edition, status, temporal_category, date_confidence)
                        values (${co.id}, ${stage}, ${amount}, ${currency}, ${amountUsd}, ${str(r.amount_text, 120)}, ${announced},
                                wgf.week_of(${announced}::date), 'reported', ${str(r.highlight ?? r.unique)}, ${str(r.summary, 1200)}, ${byId.get(itemIds[0])!.title},
-                               least(wgf.next_edition(now()), (${firstPub}::timestamptz at time zone 'Australia/Sydney')::date + 1), ${status})
+                               least(wgf.next_edition(now()), (${firstPub}::timestamptz at time zone 'Australia/Sydney')::date + 1), ${status},
+                               ${tcat}, ${conf})
                        returning id`;
     }
 
@@ -430,6 +551,11 @@ async function save(ids: number[], text: string) {
     await sql`update wgf.rounds set source_count = (select count(*) from wgf.round_sources where round_id = ${rd.id}) where id = ${rd.id}`;
   }
 
+  for (const id of historical) {
+    if (touched.has(id)) continue;
+    await sql`update wgf.raw_items set status = 'excluded', exclusion_reason = 'recap', extracted_at = now() where id = ${id} and status = 'pending'`;
+    touched.add(id);
+  }
   for (const e of excluded) {
     const id = Number(e?.id);
     if (!byId.has(id) || touched.has(id)) continue;

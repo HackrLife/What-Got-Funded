@@ -175,7 +175,7 @@ const findDomains = node({
     parameters: {
       method: 'POST', url: 'https://api.apify.com/v2/acts/apify~google-search-scraper/runs?timeout=1200', ...apify,
       sendBody: true, contentType: 'json', specifyBody: 'json',
-      jsonBody: expr('{{ JSON.stringify({ queries: ($json.need_domain || []).map(n => n.query).join("\\n") || "What Got Funded", maxPagesPerQuery: 1, saveHtmlToKeyValueStore: false, includeIcons: false }) }}'),
+      jsonBody: expr('{{ JSON.stringify({ queries: [...($json.need_domain || []).map(n => n.query), ...($json.wire || []).map(w => w.query)].join("\\n") || "What Got Funded", maxPagesPerQuery: 1, countryCode: "us", languageCode: "en", saveHtmlToKeyValueStore: false, includeIcons: false }) }}'),
       options: { timeout: 60000, response: { response: { responseFormat: 'json' } } },
     },
     credentials: apifyCred,
@@ -185,7 +185,7 @@ const findDomains = node({
 const waitSearch = node({
   type: 'n8n-nodes-base.wait',
   version: 1.1,
-  config: { name: 'Wait for search', parameters: { resume: 'timeInterval', amount: 8, unit: 'minutes' } },
+  config: { name: 'Wait for search', parameters: { resume: 'timeInterval', amount: 10, unit: 'minutes' } },
 });
 
 const getSearch = node({
@@ -210,13 +210,17 @@ const matchDomains = node({
     name: 'Match search results',
     parameters: {
       mode: 'runOnceForAllItems',
-      jsCode: `const need = $('Companies to check').first().json.need_domain || [];
+      jsCode: `const t = $('Companies to check').first().json;
+const need = t.need_domain || [], wire = t.wire || [];
 const byQuery = {};
 for (const i of $input.all()) {
   const q = i.json.searchQuery && i.json.searchQuery.term;
-  if (q) byQuery[q] = (i.json.organicResults || []).map(r => ({ url: r.url, title: r.title }));
+  if (q) byQuery[q] = (i.json.organicResults || []).map(r => ({ url: r.url, title: r.title, description: r.description, date: r.date }));
 }
-return [{ json: { items: need.map(n => ({ id: n.id, name: n.name, results: byQuery[n.query] || [] })) } }];`,
+return [{ json: {
+  items: need.map(n => ({ id: n.id, name: n.name, results: byQuery[n.query] || [] })),
+  wire: wire.map(w => ({ round_id: w.round_id, searched: w.query in byQuery, results: byQuery[w.query] || [] })),
+} }];`,
     },
   },
 });
@@ -230,7 +234,7 @@ const saveDomains = node({
     parameters: {
       method: 'POST', url: FN, sendHeaders: true, headerParameters: headers,
       sendBody: true, contentType: 'json', specifyBody: 'json',
-      jsonBody: expr('{{ JSON.stringify({ mode: "company_domains", items: $json.items }) }}'),
+      jsonBody: expr('{{ JSON.stringify({ mode: "company_domains", items: $json.items, wire: $json.wire }) }}'),
       options: { timeout: 120000, ...lenient },
     },
   },

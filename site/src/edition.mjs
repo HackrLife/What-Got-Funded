@@ -181,6 +181,14 @@ const lk = (href, text) => href ? `<a href="${esc(href)}" rel="noopener" target=
 const host = (u) => { try { return new URL(u).hostname.replace(/^www\./, ""); } catch { return ""; } };
 const srcName = (s) => /^google news/i.test(s.source || "") ? "Google News" : (s.source || host(s.url));
 
+// The earliest source, with its own date: the dateline readers can check
+export function firstSource(r) {
+  const s = [...(r.sources || [])].filter((x) => x.url).sort((a, b) => String(a.published_at || "9").localeCompare(String(b.published_at || "9")))[0];
+  if (!s) return "";
+  const d = s.published_at ? ` (${shortDay(String(s.published_at).slice(0, 10))})` : "";
+  return `${lk(s.url, srcName(s))}${esc(d)}`;
+}
+
 export function startupBlock(r, { level = "h4", companyHref = null } = {}) {
   const f = startupFacts(r);
   const founders = (r.founders || []).map((p) => {
@@ -207,7 +215,7 @@ export function startupBlock(r, { level = "h4", companyHref = null } = {}) {
   ${f.unique ? `<p class="uq"><b>What stands out:</b> ${esc(f.unique)}</p>` : ""}
   <dl>${dl}</dl>
   ${founders ? `<div class="fd"><b>Founders</b><ul>${founders}</ul></div>` : ""}
-  ${srcs ? `<p class="srcs">Reported by ${srcs}</p>` : ""}
+  ${firstSource(r) ? `<p class="srcs">Announced ${esc(shortDay(r.announced_on))}. First reported by ${firstSource(r)}${(r.sources || []).length > 1 ? `. Also: ${srcs.split(" · ").slice(1).join(" · ")}` : ""}</p>` : ""}
 </article>`;
 }
 
