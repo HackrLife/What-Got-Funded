@@ -45,13 +45,12 @@ const is9pm = node({
 });
 const runNow = trigger({ type: 'n8n-nodes-base.manualTrigger', version: 1, config: { name: 'Run now' } });
 
-const setting = (id, name, value) => ({ id, name, value, type: 'string' });
 const nightly = node({
   type: 'n8n-nodes-base.set',
   version: 3.4,
   config: {
     name: 'Nightly settings',
-    parameters: { mode: 'manual', includeOtherFields: false, assignments: { assignments: [setting('n-date', 'target_date', ''), setting('n-run', 'run', 'full')] } },
+    parameters: { mode: 'manual', includeOtherFields: false, assignments: { assignments: [{ id: 'n-date', name: 'target_date', value: '', type: 'string' }, { id: 'n-run', name: 'run', value: 'full', type: 'string' }] } },
   },
 });
 // Edit these two values before a manual run. target_date: YYYY-MM-DD, empty = yesterday in Sydney.
@@ -61,20 +60,12 @@ const runSettings = node({
   version: 3.4,
   config: {
     name: 'Run-now settings',
-    parameters: { mode: 'manual', includeOtherFields: false, assignments: { assignments: [setting('r-date', 'target_date', ''), setting('r-run', 'run', 'full')] } },
-  },
-});
-const rule = (key) => ({
-  outputKey: key,
-  conditions: {
-    options: { caseSensitive: true, leftValue: '', typeValidation: 'strict' },
-    conditions: [{ leftValue: expr('{{ $json.run }}'), operator: { type: 'string', operation: 'equals' }, rightValue: key }],
-    combinator: 'and',
+    parameters: { mode: 'manual', includeOtherFields: false, assignments: { assignments: [{ id: 'r-date', name: 'target_date', value: '', type: 'string' }, { id: 'r-run', name: 'run', value: 'full', type: 'string' }] } },
   },
 });
 const route = switchCase({
   version: 3.2,
-  config: { name: 'What to run', parameters: { rules: { values: [rule('full'), rule('verify_only'), rule('verifier_test')] } } },
+  config: { name: 'What to run', parameters: { rules: { values: [{ outputKey: 'full', conditions: { options: { caseSensitive: true, leftValue: '', typeValidation: 'strict' }, conditions: [{ leftValue: expr('{{ $json.run }}'), operator: { type: 'string', operation: 'equals' }, rightValue: 'full' }], combinator: 'and' } }, { outputKey: 'verify_only', conditions: { options: { caseSensitive: true, leftValue: '', typeValidation: 'strict' }, conditions: [{ leftValue: expr('{{ $json.run }}'), operator: { type: 'string', operation: 'equals' }, rightValue: 'verify_only' }], combinator: 'and' } }, { outputKey: 'verifier_test', conditions: { options: { caseSensitive: true, leftValue: '', typeValidation: 'strict' }, conditions: [{ leftValue: expr('{{ $json.run }}'), operator: { type: 'string', operation: 'equals' }, rightValue: 'verifier_test' }], combinator: 'and' } }] } } },
 });
 const RUN = "$('What to run').first().json.run";
 
@@ -388,31 +379,32 @@ const saveSites = node({
 
 // ---------- Agent 3: Verifier ----------
 const VERIFY = 'https://cxtcwslqzrzjaulqcvvu.supabase.co/functions/v1/wgf-verify';
-const verifyCall = (name, body, extra = {}) => node({
+
+const geminiTargets = node({
   type: 'n8n-nodes-base.httpRequest',
   version: 4.4,
   config: {
-    name, executeOnce: true, ...extra,
+    name: 'Rounds to verify', executeOnce: true,
     parameters: {
       method: 'POST', url: VERIFY, sendHeaders: true, headerParameters: headers,
-      sendBody: true, contentType: 'json', specifyBody: 'json', jsonBody: expr(body),
+      sendBody: true, contentType: 'json', specifyBody: 'json', jsonBody: expr(`{{ JSON.stringify(${RUN} === "verifier_test" ? { mode: "targets", checker: "gemini", gold: true } : { mode: "targets", checker: "gemini" }) }}`),
       options: { timeout: 120000, ...lenient },
     },
   },
 });
-const splitCode = (name) => node({
+const geminiSplit = node({
   type: 'n8n-nodes-base.code',
   version: 2,
   config: {
-    name,
+    name: 'One Gemini request per round',
     parameters: { mode: 'runOnceForAllItems', jsCode: `const items = $input.first().json.items || [];
 return items.length ? items.map(i => ({ json: i })) : [{ json: { none: true } }];` },
   },
 });
-const anyRounds = (name) => ifElse({
+const anyGemini = ifElse({
   version: 2.2,
   config: {
-    name,
+    name: 'Any rounds to verify',
     parameters: {
       conditions: {
         options: { caseSensitive: true, leftValue: '', typeValidation: 'loose' },
@@ -422,11 +414,6 @@ const anyRounds = (name) => ifElse({
     },
   },
 });
-
-const geminiTargets = verifyCall('Rounds to verify',
-  `{{ JSON.stringify(${RUN} === "verifier_test" ? { mode: "targets", checker: "gemini", gold: true } : { mode: "targets", checker: "gemini" }) }}`);
-const geminiSplit = splitCode('One Gemini request per round');
-const anyGemini = anyRounds('Any rounds to verify');
 const gemini = node({
   type: 'n8n-nodes-base.httpRequest',
   version: 4.4,
@@ -457,10 +444,40 @@ const saveGemini = node({
   },
 });
 
-const claudeTargets = verifyCall('Second opinions',
-  `{{ JSON.stringify(${RUN} === "verifier_test" ? { mode: "targets", checker: "claude", gold: true } : { mode: "targets", checker: "claude" }) }}`);
-const claudeSplit = splitCode('One Claude request per round');
-const anyClaude = anyRounds('Any second opinions');
+const claudeTargets = node({
+  type: 'n8n-nodes-base.httpRequest',
+  version: 4.4,
+  config: {
+    name: 'Second opinions', executeOnce: true,
+    parameters: {
+      method: 'POST', url: VERIFY, sendHeaders: true, headerParameters: headers,
+      sendBody: true, contentType: 'json', specifyBody: 'json', jsonBody: expr(`{{ JSON.stringify(${RUN} === "verifier_test" ? { mode: "targets", checker: "claude", gold: true } : { mode: "targets", checker: "claude" }) }}`),
+      options: { timeout: 120000, ...lenient },
+    },
+  },
+});
+const claudeSplit = node({
+  type: 'n8n-nodes-base.code',
+  version: 2,
+  config: {
+    name: 'One Claude request per round',
+    parameters: { mode: 'runOnceForAllItems', jsCode: `const items = $input.first().json.items || [];
+return items.length ? items.map(i => ({ json: i })) : [{ json: { none: true } }];` },
+  },
+});
+const anyClaude = ifElse({
+  version: 2.2,
+  config: {
+    name: 'Any second opinions',
+    parameters: {
+      conditions: {
+        options: { caseSensitive: true, leftValue: '', typeValidation: 'loose' },
+        conditions: [{ leftValue: expr('{{ $json.round_id }}'), operator: { type: 'number', operation: 'exists', singleValue: true } }],
+        combinator: 'and',
+      },
+    },
+  },
+});
 const claudeCheck = node({
   type: 'n8n-nodes-base.httpRequest',
   version: 4.4,
@@ -509,8 +526,30 @@ const isTest = ifElse({
     },
   },
 });
-const scorePipeline = verifyCall('Score: whole verifier', '{{ JSON.stringify({ mode: "score", checker: "pipeline" }) }}');
-const scoreGemini = verifyCall('Score: Gemini alone', '{{ JSON.stringify({ mode: "score", checker: "gemini" }) }}');
+const scorePipeline = node({
+  type: 'n8n-nodes-base.httpRequest',
+  version: 4.4,
+  config: {
+    name: 'Score: whole verifier', executeOnce: true,
+    parameters: {
+      method: 'POST', url: VERIFY, sendHeaders: true, headerParameters: headers,
+      sendBody: true, contentType: 'json', specifyBody: 'json', jsonBody: expr('{{ JSON.stringify({ mode: "score", checker: "pipeline" }) }}'),
+      options: { timeout: 120000, ...lenient },
+    },
+  },
+});
+const scoreGemini = node({
+  type: 'n8n-nodes-base.httpRequest',
+  version: 4.4,
+  config: {
+    name: 'Score: Gemini alone', executeOnce: true,
+    parameters: {
+      method: 'POST', url: VERIFY, sendHeaders: true, headerParameters: headers,
+      sendBody: true, contentType: 'json', specifyBody: 'json', jsonBody: expr('{{ JSON.stringify({ mode: "score", checker: "gemini" }) }}'),
+      options: { timeout: 120000, ...lenient },
+    },
+  },
+});
 
 sticky(`## Agent 1 · Scraper
 Apify crawler over ~300 sources for yesterday in Sydney (or the Run-now target_date).`, [startCrawl, waitCrawl, crawlDone], { color: 4 });
