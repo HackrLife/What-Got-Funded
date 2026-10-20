@@ -83,7 +83,7 @@ async function targets(body: Record<string, unknown>) {
     if (checker === "gemini") ids = (await sql`select round_id from wgf.gold_rounds order by round_id`).map((r) => Number(r.round_id));
     else {
       const rows = await sql`
-        select distinct on (k.round_id) k.round_id, k.verdict, k.earliest_date::text as earliest, k.confidence, k.is_equity_round, k.day::text as day, r.amount_usd
+        select distinct on (k.round_id) k.round_id, k.verdict, k.earliest_date::text as earliest, k.confidence, k.is_equity_round, k.page_ok, k.day::text as day, r.amount_usd
         from wgf.round_checks k join wgf.gold_rounds g on g.round_id = k.round_id join wgf.rounds r on r.id = k.round_id
         where k.dry_run and k.checker = 'gemini' and k.created_at > now() - interval '1 day'
         order by k.round_id, k.created_at desc`;
@@ -115,17 +115,19 @@ async function targets(body: Record<string, unknown>) {
   };
 }
 
-type Check = { verdict: string; earliest: string | null; conf: number; notEquity: boolean };
+type Check = { verdict: string; earliest: string | null; conf: number; notEquity: boolean; pageOk: boolean };
 const checkOf = (k: Record<string, any>): Check => ({
   verdict: String(k.verdict), earliest: k.earliest ?? null, conf: k.confidence == null ? 0 : Number(k.confidence),
-  notEquity: k.verdict === "NOT_A_ROUND" || k.is_equity_round === false,
+  notEquity: k.verdict === "NOT_A_ROUND" || k.is_equity_round === false, pageOk: k.page_ok === true,
 });
 
 // The one decision rule, used for live runs and for scoring. status null = undecided (Gemini: wait for Claude).
 function decide(checker: string, c: Check, amount: number, day: string, geminiVerdict: string | null): { status: string | null; newDay: string | null } {
   const big = amount >= BIG;
   if (checker === "gemini") {
+    // Gemini's dates are only trusted when the page it cites really carries that date and names the company
     if (c.notEquity && c.conf >= 0.7) return { status: "not_venture", newDay: null };
+    if (!c.pageOk) return { status: null, newDay: null };
     if (c.verdict === "EARLIER" && c.earliest && c.earliest < day && c.conf >= 0.6) return { status: "missed_window", newDay: null };
     if (c.verdict === "LATER" && c.earliest && c.earliest > day && c.conf >= 0.7 && !big) return { status: "live", newDay: c.earliest };
     if (c.verdict === "ON_DAY" && c.conf >= 0.75 && !big) return { status: "live", newDay: null };
@@ -158,9 +160,46 @@ function parseVerdict(text: string) {
 }
 const isDate = (v: unknown) => /^\d{4}-\d{2}-\d{2}$/.test(String(v ?? ""));
 
+// Open the page a checker cites and read its real publish date, without trusting the model.
+// ok = the page loads, names the company, and its date equals the date the checker claimed.
+async function pageCheck(url: string | null, claimed: string | null, names: string[]) {
+  if (!url || !/^https?:\/\//.test(url)) return { ok: false, date: null as string | null, note: "no url" };
+  if (/instagram\.com|facebook\.com|x\.com|twitter\.com|linkedin\.com|vertexaisearch/.test(url)) return { ok: false, date: null, note: "social or redirect url" };
+  let html = "";
+  try {
+    const res = await fetch(url, { redirect: "follow", signal: AbortSignal.timeout(12000),
+      headers: { "user-agent": "Mozilla/5.0 (compatible; WhatGotFundedBot/1.0; +https://whatgotfunded.com)", "accept-language": "en,zh;q=0.8" } });
+    if (!res.ok) return { ok: false, date: null, note: `http ${res.status}` };
+    html = (await res.text()).slice(0, 600_000);
+  } catch (e) { return { ok: false, date: null, note: "unreachable" }; }
+  const found: string[] = [];
+  const meta = /<meta[^>]+(?:property|name|itemprop)=["'](?:article:published_time|og:published_time|og:release_date|datePublished|pubdate|publishdate|publish-date|PubDate|publication_date|date|sailthru\.date|parsely-pub-date)["'][^>]*>/gi;
+  for (const m of html.match(meta) ?? []) { const c = m.match(/content=["']([^"']+)["']/i); if (c) found.push(c[1]); }
+  for (const m of html.matchAll(/"datePublished"\s*:\s*"([^"]+)"/g)) found.push(m[1]);
+  for (const m of html.matchAll(/<time[^>]+datetime=["']([^"']+)["']/gi)) found.push(m[1]);
+  let date: string | null = null;
+  for (const f of found) { const m = f.match(/(\d{4})-?(\d{2})-?(\d{2})/); if (m) { date = `${m[1]}-${m[2]}-${m[3]}`; break; } }
+  if (!date) {   // dates in the URL path: /2026/10/18/, t20261018_, 202610181079555
+    const m = url.match(/\/(20\d{2})\/(\d{2})\/(\d{2})\//) ?? url.match(/(20\d{2})(\d{2})(\d{2})(?:\d|_|\/|\.)/) ?? null;
+    if (m && +m[2] >= 1 && +m[2] <= 12 && +m[3] >= 1 && +m[3] <= 31) date = `${m[1]}-${m[2]}-${m[3]}`;
+  }
+  if (!date) {   // visible text dates, e.g. 2026-10-18 or 2026年10月18日
+    const m = html.match(/(20\d{2})[-/年.](\d{1,2})[-/月.](\d{1,2})/);
+    if (m) date = `${m[1]}-${m[2].padStart(2, "0")}-${m[3].padStart(2, "0")}`;
+  }
+  const text = html.toLowerCase();
+  // full name, or its distinctive first word (4+ letters, not "the") for names the page may shorten
+  const keys = names.filter(Boolean).flatMap((n) => { const l = n.toLowerCase().replace(/^the\s+/, ""); const w = l.split(/\s+/)[0]; return w.length >= 4 && w !== l ? [l, w] : [l]; });
+  const named = keys.some((k) => text.includes(k));
+  if (!named) return { ok: false, date, note: "page does not name the company" };
+  if (!date) return { ok: false, date, note: "no date on page" };
+  return { ok: date === claimed, date, note: date === claimed ? "date confirmed" : `page dated ${date}` };
+}
+
 async function save(body: Record<string, unknown>) {
   const roundId = Number(body.round_id), checker = String(body.checker ?? "gemini"), dry = body.dry_run === true;
-  const [r] = await sql`select r.id, r.status, r.announced_on::text as announced, r.amount_usd from wgf.rounds r where r.id = ${roundId}`;
+  const [r] = await sql`select r.id, r.status, r.announced_on::text as announced, r.amount_usd, c.name as company, c.name_native as native, c.name_en as company_en
+                        from wgf.rounds r join wgf.companies c on c.id = r.company_id where r.id = ${roundId}`;
   if (!r) return { error: "no such round" };
   const day = isDate(body.day) ? String(body.day) : r.announced;
   const text = replyText(body.reply);
@@ -168,10 +207,13 @@ async function save(body: Record<string, unknown>) {
   const verdict = v ? String(v.verdict) : "ERROR";
   const earliest = v && isDate(v.earliest_date) ? String(v.earliest_date) : null;
   const conf = v && typeof v.confidence === "number" ? Math.max(0, Math.min(1, v.confidence)) : null;
-  await sql`insert into wgf.round_checks (round_id, checker, model, day, verdict, earliest_date, earliest_url, is_equity_round, confidence, notes, dry_run, raw)
+  const page = ["ON_DAY", "EARLIER", "LATER"].includes(verdict)
+    ? await pageCheck(v?.earliest_url ?? null, earliest, [r.company, r.native, r.company_en])
+    : { ok: null, date: null, note: null };
+  await sql`insert into wgf.round_checks (round_id, checker, model, day, verdict, earliest_date, earliest_url, is_equity_round, confidence, notes, dry_run, raw, page_date, page_ok, page_note)
             values (${roundId}, ${checker}, ${String(body.model ?? "")}, ${day}, ${verdict}, ${earliest}, ${v?.earliest_url ?? null},
                     ${typeof v?.is_equity_round === "boolean" ? v.is_equity_round : null}, ${conf}, ${v?.notes ? String(v.notes).slice(0, 300) : null}, ${dry},
-                    ${sql.json({ text: text.slice(0, 4000) })})`;
+                    ${sql.json({ text: text.slice(0, 4000) })}, ${isDate(page.date) ? page.date : null}, ${page.ok}, ${page.note})`;
   if (dry || r.status !== "pending_check" || verdict === "ERROR") return { round_id: roundId, verdict, status: r.status };
 
   let geminiVerdict: string | null = null;
@@ -179,7 +221,7 @@ async function save(body: Record<string, unknown>) {
     const [g] = await sql`select verdict from wgf.round_checks where round_id = ${roundId} and checker = 'gemini' and not dry_run order by created_at desc limit 1`;
     geminiVerdict = g?.verdict ?? null;
   }
-  const { status, newDay } = decide(checker, checkOf({ verdict, earliest, confidence: conf, is_equity_round: v?.is_equity_round }), Number(r.amount_usd ?? 0), day, geminiVerdict);
+  const { status, newDay } = decide(checker, checkOf({ verdict, earliest, confidence: conf, is_equity_round: v?.is_equity_round, page_ok: page.ok }), Number(r.amount_usd ?? 0), day, geminiVerdict);
   if (status) {
     await sql`update wgf.rounds set status = ${status}, wire_checked_at = now(),
                 announced_on = coalesce(${newDay}::date, announced_on), week = case when ${newDay}::date is null then week else wgf.week_of(${newDay}::date) end,
@@ -197,7 +239,7 @@ async function score(body: Record<string, unknown>) {
   const checker = String(body.checker ?? "pipeline");
   const since = body.since ?? null;
   const latest = (who: string, model = who === checker ? (body.model ?? null) : null) => sql`
-    select distinct on (k.round_id) k.round_id, k.verdict, k.earliest_date::text as earliest, k.confidence, k.is_equity_round, k.model
+    select distinct on (k.round_id) k.round_id, k.verdict, k.earliest_date::text as earliest, k.confidence, k.is_equity_round, k.page_ok, k.model
     from wgf.round_checks k where k.dry_run and k.checker = ${who}
       and (${model}::text is null or k.model = ${model}::text)
       and k.created_at > coalesce(${since}::timestamptz, now() - interval '1 day')
