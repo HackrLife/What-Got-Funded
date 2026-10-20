@@ -67,7 +67,7 @@ const route = switchCase({
   version: 3.2,
   config: { name: 'What to run', parameters: { rules: { values: [{ outputKey: 'full', conditions: { options: { caseSensitive: true, leftValue: '', typeValidation: 'strict' }, conditions: [{ leftValue: expr('{{ $json.run }}'), operator: { type: 'string', operation: 'equals' }, rightValue: 'full' }], combinator: 'and' } }, { outputKey: 'verify_only', conditions: { options: { caseSensitive: true, leftValue: '', typeValidation: 'strict' }, conditions: [{ leftValue: expr('{{ $json.run }}'), operator: { type: 'string', operation: 'equals' }, rightValue: 'verify_only' }], combinator: 'and' } }, { outputKey: 'verifier_test', conditions: { options: { caseSensitive: true, leftValue: '', typeValidation: 'strict' }, conditions: [{ leftValue: expr('{{ $json.run }}'), operator: { type: 'string', operation: 'equals' }, rightValue: 'verifier_test' }], combinator: 'and' } }] } } },
 });
-const RUN = "$('What to run').first().json.run";
+const RUN = "($('Run-now settings').isExecuted ? $('Run-now settings').first().json.run : 'full')";
 
 // ---------- Agent 1: Scraper ----------
 const startCrawl = node({
