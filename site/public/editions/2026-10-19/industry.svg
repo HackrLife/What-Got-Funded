@@ -1,0 +1,46 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 720 428" width="720" height="428" role="img" aria-label="Funding by industry" font-family="Archivo, Helvetica, Arial, sans-serif" style="max-width:100%;height:auto">
+<rect width="720" height="428" fill="#fff"/>
+<text x="24" y="30" font-size="19" font-weight="700" fill="#172033">Funding by industry</text>
+<text x="24" y="50" font-size="13" fill="#5b6678">Disclosed capital, number of rounds on the right</text>
+<line x1="24" x2="696" y1="60" y2="60" stroke="#d5dbe3"/>
+<text x="24" y="85" font-size="15" fill="#172033">Semiconductors &amp; hardware</text>
+<rect x="234" y="71" width="252.0" height="20" rx="3" fill="#00897b"/>
+<text x="494" y="86" font-size="14" font-weight="700" fill="#172033">$1.78B</text>
+<text x="696" y="86" font-size="13" fill="#5b6678" text-anchor="end">5 rounds</text>
+<text x="24" y="119" font-size="15" fill="#172033">AI &amp; data</text>
+<rect x="234" y="105" width="28.6" height="20" rx="3" fill="#00897b"/>
+<text x="270.64381953429006" y="120" font-size="14" font-weight="700" fill="#172033">$202.8M</text>
+<text x="696" y="120" font-size="13" fill="#5b6678" text-anchor="end">7 rounds</text>
+<text x="24" y="153" font-size="15" fill="#172033">Biotech &amp; pharma</text>
+<rect x="234" y="139" width="20.5" height="20" rx="3" fill="#00897b"/>
+<text x="262.546434251115" y="154" font-size="14" font-weight="700" fill="#172033">$145.5M</text>
+<text x="696" y="154" font-size="13" fill="#5b6678" text-anchor="end">2 rounds</text>
+<text x="24" y="187" font-size="15" fill="#172033">Fintech</text>
+<rect x="234" y="173" width="14.0" height="20" rx="3" fill="#00897b"/>
+<text x="255.98299860401045" y="188" font-size="14" font-weight="700" fill="#172033">$99M</text>
+<text x="696" y="188" font-size="13" fill="#5b6678" text-anchor="end">4 rounds</text>
+<text x="24" y="221" font-size="15" fill="#172033">Consumer &amp; retail</text>
+<rect x="234" y="207" width="8.3" height="20" rx="3" fill="#00897b"/>
+<text x="250.2727195150949" y="222" font-size="14" font-weight="700" fill="#172033">$58.6M</text>
+<text x="696" y="222" font-size="13" fill="#5b6678" text-anchor="end">4 rounds</text>
+<text x="24" y="255" font-size="15" fill="#172033">Medtech &amp; devices</text>
+<rect x="234" y="241" width="5.3" height="20" rx="3" fill="#00897b"/>
+<text x="247.29659038030698" y="256" font-size="14" font-weight="700" fill="#172033">$37.5M</text>
+<text x="696" y="256" font-size="13" fill="#5b6678" text-anchor="end">2 rounds</text>
+<text x="24" y="289" font-size="15" fill="#172033">Space &amp; defence</text>
+<rect x="234" y="275" width="4.4" height="20" rx="3" fill="#00897b"/>
+<text x="246.3723198222783" y="290" font-size="14" font-weight="700" fill="#172033">$31M</text>
+<text x="696" y="290" font-size="13" fill="#5b6678" text-anchor="end">2 rounds</text>
+<text x="24" y="323" font-size="15" fill="#172033">Healthtech</text>
+<rect x="234" y="309" width="2.8" height="20" rx="3" fill="#00897b"/>
+<text x="244.82024059292675" y="324" font-size="14" font-weight="700" fill="#172033">$20M</text>
+<text x="696" y="324" font-size="13" fill="#5b6678" text-anchor="end">2 rounds</text>
+<text x="24" y="357" font-size="15" fill="#172033">Climate &amp; energy</text>
+<rect x="234" y="343" width="2.0" height="20" rx="3" fill="#00897b"/>
+<text x="244" y="358" font-size="14" font-weight="700" fill="#172033">$12.4M</text>
+<text x="696" y="358" font-size="13" fill="#5b6678" text-anchor="end">3 rounds</text>
+<text x="24" y="391" font-size="15" fill="#172033">6 other industries</text>
+<rect x="234" y="377" width="2.9" height="20" rx="3" fill="#00897b"/>
+<text x="244.93418536494505" y="392" font-size="14" font-weight="700" fill="#172033">$20.8M</text>
+<text x="696" y="392" font-size="13" fill="#5b6678" text-anchor="end">7 rounds</text>
+</svg>

@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 720 292" width="720" height="292" role="img" aria-label="Funding by region" font-family="Archivo, Helvetica, Arial, sans-serif" style="max-width:100%;height:auto">
+<rect width="720" height="292" fill="#fff"/>
+<text x="24" y="30" font-size="19" font-weight="700" fill="#172033">Funding by region</text>
+<text x="24" y="50" font-size="13" fill="#5b6678">Disclosed capital, number of rounds on the right</text>
+<line x1="24" x2="696" y1="60" y2="60" stroke="#d5dbe3"/>
+<text x="24" y="85" font-size="15" fill="#172033">Americas</text>
+<rect x="234" y="71" width="252.0" height="20" rx="3" fill="#f9a825"/>
+<text x="494" y="86" font-size="14" font-weight="700" fill="#172033">$1.77B</text>
+<text x="696" y="86" font-size="13" fill="#5b6678" text-anchor="end">12 rounds</text>
+<text x="24" y="119" font-size="15" fill="#172033">Asia-Pacific</text>
+<rect x="234" y="105" width="67.1" height="20" rx="3" fill="#00897b"/>
+<text x="309.12660173927304" y="120" font-size="14" font-weight="700" fill="#172033">$471.1M</text>
+<text x="696" y="120" font-size="13" fill="#5b6678" text-anchor="end">16 rounds</text>
+<text x="24" y="153" font-size="15" fill="#172033">Europe</text>
+<rect x="234" y="139" width="21.6" height="20" rx="3" fill="#3d5afe"/>
+<text x="263.5999708694958" y="154" font-size="14" font-weight="700" fill="#172033">$151.6M</text>
+<text x="696" y="154" font-size="13" fill="#5b6678" text-anchor="end">5 rounds</text>
+<text x="24" y="187" font-size="15" fill="#172033">Middle East</text>
+<rect x="234" y="173" width="2.9" height="20" rx="3" fill="#e53935"/>
+<text x="244.87789922983617" y="188" font-size="14" font-weight="700" fill="#172033">$20.2M</text>
+<text x="696" y="188" font-size="13" fill="#5b6678" text-anchor="end">3 rounds</text>
+<text x="24" y="221" font-size="15" fill="#172033">Africa</text>
+<rect x="234" y="207" width="2.0" height="20" rx="3" fill="#8e24aa"/>
+<text x="244" y="222" font-size="14" font-weight="700" fill="#172033">Not disclosed</text>
+<text x="696" y="222" font-size="13" fill="#5b6678" text-anchor="end">1 round</text>
+<text x="24" y="255" font-size="15" fill="#172033">Region not stated</text>
+<rect x="234" y="241" width="2.0" height="20" rx="3" fill="#9aa3b2"/>
+<text x="244" y="256" font-size="14" font-weight="700" fill="#172033">Not disclosed</text>
+<text x="696" y="256" font-size="13" fill="#5b6678" text-anchor="end">1 round</text>
+</svg>

@@ -1,0 +1,46 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 720 428" width="720" height="428" role="img" aria-label="Top investors" font-family="Archivo, Helvetica, Arial, sans-serif" style="max-width:100%;height:auto">
+<rect width="720" height="428" fill="#fff"/>
+<text x="24" y="30" font-size="19" font-weight="700" fill="#172033">Top investors</text>
+<text x="24" y="50" font-size="13" fill="#5b6678">Ranked by rounds backed today, then by round value; bars show the value of rounds joined</text>
+<line x1="24" x2="696" y1="60" y2="60" stroke="#d5dbe3"/>
+<text x="24" y="85" font-size="15" fill="#172033">Innovation X</text>
+<rect x="234" y="71" width="252.0" height="20" rx="3" fill="#172033"/>
+<text x="494" y="86" font-size="14" font-weight="700" fill="#172033">$1.5B</text>
+<text x="696" y="86" font-size="13" fill="#5b6678" text-anchor="end">1 round, led</text>
+<text x="24" y="119" font-size="15" fill="#172033">M-Ventures</text>
+<rect x="234" y="105" width="22.7" height="20" rx="3" fill="#172033"/>
+<text x="264.68" y="120" font-size="14" font-weight="700" fill="#172033">$135M</text>
+<text x="696" y="120" font-size="13" fill="#5b6678" text-anchor="end">1 round, led</text>
+<text x="24" y="153" font-size="15" fill="#172033">Forerunner Ventures</text>
+<rect x="234" y="139" width="18.1" height="20" rx="3" fill="#172033"/>
+<text x="260.144" y="154" font-size="14" font-weight="700" fill="#172033">$108M</text>
+<text x="696" y="154" font-size="13" fill="#5b6678" text-anchor="end">1 round, led</text>
+<text x="24" y="187" font-size="15" fill="#172033">B Capital</text>
+<rect x="234" y="173" width="15.1" height="20" rx="3" fill="#172033"/>
+<text x="257.12" y="188" font-size="14" font-weight="700" fill="#172033">$90M</text>
+<text x="696" y="188" font-size="13" fill="#5b6678" text-anchor="end">1 round, led</text>
+<text x="24" y="221" font-size="15" fill="#172033">Boyuan Capital</text>
+<rect x="234" y="207" width="10.1" height="20" rx="3" fill="#172033"/>
+<text x="252.050526248" y="222" font-size="14" font-weight="700" fill="#172033">$59.8M</text>
+<text x="696" y="222" font-size="13" fill="#5b6678" text-anchor="end">1 round, led</text>
+<text x="24" y="255" font-size="15" fill="#172033">Golden Stone Investment</text>
+<rect x="234" y="241" width="7.5" height="20" rx="3" fill="#172033"/>
+<text x="249.537894728" y="256" font-size="14" font-weight="700" fill="#172033">$44.9M</text>
+<text x="696" y="256" font-size="13" fill="#5b6678" text-anchor="end">1 round, led</text>
+<text x="24" y="289" font-size="15" fill="#172033">Catalio Capital Management</text>
+<rect x="234" y="275" width="6.0" height="20" rx="3" fill="#172033"/>
+<text x="248.048" y="290" font-size="14" font-weight="700" fill="#172033">$36M</text>
+<text x="696" y="290" font-size="13" fill="#5b6678" text-anchor="end">1 round, led</text>
+<text x="24" y="323" font-size="15" fill="#172033">Lan Xue (Basis Set Ventures)</text>
+<rect x="234" y="309" width="2.9" height="20" rx="3" fill="#172033"/>
+<text x="244.9232" y="324" font-size="14" font-weight="700" fill="#172033">$17.4M</text>
+<text x="696" y="324" font-size="13" fill="#5b6678" text-anchor="end">1 round, led</text>
+<text x="24" y="357" font-size="15" fill="#172033">Mirae Asset Venture Investm…</text>
+<rect x="234" y="343" width="2.0" height="20" rx="3" fill="#172033"/>
+<text x="244" y="358" font-size="14" font-weight="700" fill="#172033">$11.5M</text>
+<text x="696" y="358" font-size="13" fill="#5b6678" text-anchor="end">1 round, led</text>
+<text x="24" y="391" font-size="15" fill="#172033">Yuanyi Investment</text>
+<rect x="234" y="377" width="2.0" height="20" rx="3" fill="#172033"/>
+<text x="244" y="392" font-size="14" font-weight="700" fill="#172033">$10.5M</text>
+<text x="696" y="392" font-size="13" fill="#5b6678" text-anchor="end">1 round, led</text>
+</svg>
