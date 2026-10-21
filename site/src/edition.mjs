@@ -1,3 +1,4 @@
+import { startupUnit } from "./units.mjs";
 // Daily edition: one model, rendered two ways.
 //   - the full article on the site (every round of the day)
 //   - the newsletter (Beehiiv): the same headline and four visuals, at most 20 startups, linking to the article
@@ -227,7 +228,7 @@ export function articleBody(m, { prev, next, countryLabel = (x) => x } = {}) {
     for (const r of g.rows) { const k = r.country || "Country not stated"; if (!byCountry.has(k)) byCountry.set(k, []); byCountry.get(k).push(r); }
     const subs = [...byCountry.entries()].sort((a, b) => sum(b[1].map((r) => r.amount_usd || 0)) - sum(a[1].map((r) => r.amount_usd || 0)) || b[1].length - a[1].length)
       .map(([country, rs]) => `<section class="ctry"><h3>${esc(country)} <small>${plural(rs.length, "round")}${sum(rs.map((r) => r.amount_usd || 0)) ? `, ${usd(sum(rs.map((r) => r.amount_usd || 0)))}` : ""}</small></h3>
-<div class="cards">${rs.map((r) => startupBlock(r, { companyHref: r.href })).join("\n")}</div></section>`).join("\n");
+<div class="units all">${rs.map((r) => startupUnit(r, { heading: "h4" })).join("\n")}</div></section>`).join("\n");
     return `<section class="reg" id="reg-${g.k}" style="--c:${g.color}"><h2>${esc(g.name)} <small>${plural(g.n, "round")}${g.v ? `, ${usd(g.v)}` : ""}</small></h2>\n${subs}</section>`;
   }).join("\n");
   return `<article class="ed">
@@ -244,7 +245,7 @@ export function articleBody(m, { prev, next, countryLabel = (x) => x } = {}) {
 </section>
 <nav class="ed-toc" aria-label="Regions">${toc}</nav>
 ${sections}
-<nav class="ed-nav">${prev ? `<a href="/editions/${prev}/">Previous edition</a>` : "<span></span>"}<a href="/day/${m.day}/">Table of all rounds</a>${next ? `<a href="/editions/${next}/">Next edition</a>` : "<span></span>"}</nav>
+<nav class="ed-nav">${prev ? `<a href="/editions/${prev}/">Previous edition</a>` : "<span></span>"}<a href="/data/${m.day}.csv" download>Download all ${m.rounds.length} as CSV</a>${next ? `<a href="/editions/${next}/">Next edition</a>` : "<span></span>"}</nav>
 </article>`;
 }
 

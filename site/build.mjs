@@ -9,7 +9,8 @@ import path from "node:path";
 import crypto from "node:crypto";
 import { fileURLToPath } from "node:url";
 import { CONTINENTS, continentOf, countryLabel } from "./src/regions.mjs";
-import { editionModel, articleBody, editionCard } from "./src/edition.mjs";
+import { editionModel, articleBody, editionCard, cleanFounders, cleanInvestors } from "./src/edition.mjs";
+import { startupList, regionTiles, rankBars, chartCard, stackBars, byRegion, roundsCsv, firstSource as firstSourceOf } from "./src/units.mjs";
 // Daily editions start with the 18 October 2026 issue. Headline overrides: data/editions.json { "YYYY-MM-DD": { "headline": "...", "dek": "..." } }
 const EDITION_START = "2026-10-19";
 
@@ -18,10 +19,11 @@ const OUT = path.join(ROOT, "dist");
 const SITE_URL = (process.env.SITE_URL || "https://whatgotfunded.com").replace(/\/$/, "");
 const PUBLISH_URL = process.env.WGF_PUBLISH_URL || "https://cxtcwslqzrzjaulqcvvu.supabase.co/functions/v1/wgf-publish?days=150";
 const BEEHIIV_FORM = process.env.BEEHIIV_FORM_ID || "25f5c9ba-9712-405b-8319-832a0415e181";
-const SOURCES_LINE = "343 news sources and 76 local-language news searches across 74 markets";
+let SOURCES_LINE = "more than 300 news sources and local-language news searches";   // set from the source registry in main()
 
 // ---------- data ----------
 async function loadData() {
+  if (process.env.WGF_LOCAL_DATA) return JSON.parse(fs.readFileSync(process.env.WGF_LOCAL_DATA, "utf8"));   // local previews
   const token = process.env.WGF_READ_TOKEN;
   if (token) {
     const res = await fetch(PUBLISH_URL, { headers: { "x-wgf-read-token": token } });
@@ -175,92 +177,40 @@ function treemapData(rows) {
 }
 
 // ---------- pages ----------
-function homePage(day, rows, prev, next, isYesterday, edCards = "") {
-  const disclosed = rows.filter((r) => r.amount_usd);
-  const total = sum(disclosed.map((r) => r.amount_usd));
-  const when = isYesterday ? "Yesterday" : `On ${weekday(day)}`;
-  const conts = byContinent(rows);
-  const legend = conts.map((c) => `<a href="/day/${day}/?c=${c.k}" style="--c:${c.color}"><span class="n num">${c.v ? usd(c.v) : "–"}</span><small>${c.name}, ${plural(c.n, "round")}</small></a>`).join("");
-
-  const biggest = [...disclosed].sort((a, b) => b.amount_usd - a.amount_usd)[0];
-  const local = rows.filter((r) => r !== biggest && r.sources.some((s) => s.language && !/^en/i.test(s.language)))
-    .sort((a, b) => (b.amount_usd || 0) - (a.amount_usd || 0))[0];
-  const most = rows.filter((r) => r !== biggest && r !== local).sort((a, b) => b.sources.length - a.sources.length || (b.amount_usd || 0) - (a.amount_usd || 0))[0];
-  const card = (h, r, extra = "") => !r ? "" : `<div><h2>${h}</h2>
-    <a class="co" href="${r.href}">${esc(r.company)}</a>
-    <div class="meta"><span class="dot c-${r.cont}"></span>${esc([r.country || "Country not stated", r.sector].filter(Boolean).join(", "))}${r.amount_usd ? `, <span class="num">${usd(r.amount_usd)}</span>` : ""}${r.stage !== "undisclosed" ? ` ${STAGE[r.stage]}` : ""}</div>
-    ${whyOf(r) ? `<p>${esc(whyOf(r))}${extra}</p>` : extra ? `<p>${extra.trim()}</p>` : ""}
-    <a class="more" href="${r.href}">Read the round</a></div>`;
-  const localLang = local && local.sources.find((s) => s.language && !/^en/i.test(s.language));
-  const LANG = { ja: "Japanese", zh: "Chinese", ko: "Korean", de: "German", fr: "French", es: "Spanish", pt: "Portuguese", it: "Italian", nl: "Dutch",
-    sv: "Swedish", no: "Norwegian", da: "Danish", fi: "Finnish", pl: "Polish", tr: "Turkish", ar: "Arabic", he: "Hebrew", id: "Indonesian",
-    vi: "Vietnamese", th: "Thai", hi: "Hindi", ru: "Russian", uk: "Ukrainian", cs: "Czech", ro: "Romanian", hu: "Hungarian", el: "Greek" };
-  const langName = localLang ? LANG[String(localLang.language).slice(0, 2).toLowerCase()] : null;
-
-  const top = [...rows].sort((a, b) => (b.amount_usd || 0) - (a.amount_usd || 0)).slice(0, 10);
-  const body = `
-${edCards ? `<section class="edfeed" aria-label="Daily editions">${edCards}</section>` : ""}
-<section class="hero">
-  <div class="dayline"><span>${longDate(day)}, all markets</span><span class="daynav">${prev ? `<a href="/day/${prev}/">Previous day</a>` : '<span class="off">Previous day</span>'}<span>|</span><a href="/day/${day}/">Every round</a></span></div>
-  <div class="lead">
-    <h1 class="say">${when}, ${plural(rows.length, "startup")} raised ${usd(total) || "undisclosed amounts"}.</h1>
-    <p class="sub">Every startup funding round, every day, found across ${SOURCES_LINE}. ${disclosed.length} of ${rows.length} rounds disclosed an amount.</p>
-    <div class="legend">${legend}</div>
-  </div>
-  <div><div id="map" role="img" aria-label="Capital raised by country, grouped by continent"></div>
-  <p class="note">Tile size is disclosed capital. Select a tile or a continent to see its rounds.</p></div>
+const ICON_DL = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v11m0 0l-4.5-4.5M12 14l4.5-4.5M4 17v3h16v-3" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+function topCountries(rows, n = 8) {
+  const m = new Map();
+  for (const r of rows) { const k = r.country || "Not stated"; const e = m.get(k) || { label: k, v: 0, n: 0, color: contOf(r.cont).color, dot: true }; e.v += r.amount_usd || 0; e.n++; m.set(k, e); }
+  return [...m.values()].sort((a, b) => b.v - a.v || b.n - a.n).slice(0, n);
+}
+function dayView(day, rows, { when, edition = false }) {
+  const disclosed = rows.filter((r) => r.amount_usd), total = sum(disclosed.map((r) => r.amount_usd));
+  const csv = `/data/${day}.csv`;
+  return `<div class="wrap">
+<section class="hero2">
+  <p class="kick">${edition ? "Daily edition · " : ""}${esc(longDate(day))}</p>
+  <h1>Every startup that raised money ${esc(when)}, in one place.</h1>
+  <p class="lede">Found across ${SOURCES_LINE}, and checked against the first public report of each round.</p>
+  <div class="acts">${edition ? `<a class="btn2 dark" href="/editions/${day}/">Read the full edition</a>` : ""}<a class="btn2" href="${csv}" download>${ICON_DL}Download the day as CSV</a></div>
+  <div class="stats"><div><span class="sv">${usd(total) || "Undisclosed"}</span><span class="sl">raised</span></div><div><span class="sv">${rows.length}</span><span class="sl">${rows.length === 1 ? "startup" : "startups"}</span></div><div><span class="sv">${disclosed.length}/${rows.length}</span><span class="sl">disclosed an amount</span></div></div>
 </section>
-<script type="application/json" id="map-data">${JSON.stringify({ day, groups: treemapData(rows) }).replace(/</g, "\\u003c")}</script>
-<section class="three">
-  ${card("Biggest round", biggest)}
-  ${card("Found in local press", local, langName ? ` First reported in ${langName}.` : "")}
-  ${card("Most reported", most, most ? ` Covered by ${plural(most.sources.length, "source")}.` : "")}
-</section>
-<section class="listing">
-  <div class="head"><h2>The day's largest rounds</h2><a href="/day/${day}/">All ${plural(rows.length, "round")}</a></div>
-  ${roundsTable(top)}
-</section>
-${joinBand()}`;
-  return shell({ title: `What Got Funded: ${plural(rows.length, "startup")} raised ${usd(total) || ""} on ${dayMonth(day)}`, desc: `Every startup funding round announced on ${longDate(day)}, across all markets.`, active: "Today", body, canonical: "/", scripts: BEEHIIV_SCRIPT });
+<section class="block"><h2>Where the money went</h2>${regionTiles(rows)}</section>
+<section class="block"><h2>Top countries</h2>${rankBars(topCountries(rows))}</section>
+${startupList(rows, { csv, day })}
+</div>`;
 }
 
-function dayPage(day, rows, prev, next) {
-  const disclosed = rows.filter((r) => r.amount_usd), total = sum(disclosed.map((r) => r.amount_usd));
-  const sorted = [...rows].sort((a, b) => (b.amount_usd || 0) - (a.amount_usd || 0) || a.company.localeCompare(b.company));
-  const count = (key) => { const m = new Map(); for (const r of rows) { const v = key(r); m.set(v, (m.get(v) || 0) + 1); } return m; };
-  const contC = count((r) => r.cont), countryC = count((r) => r.country || ""), stageC = count((r) => r.stage), sectorC = count((r) => r.sector || "Other");
-  const box = (name, value, label, n, extra = "") => `<label><input type="checkbox" name="${name}" value="${esc(value)}"${extra}>${label}<span class="ct">${n}</span></label>`;
-  const contBoxes = CONTINENTS.filter((c) => contC.get(c.k)).map((c) => box("c", c.k, `<span class="dot c-${c.k}"></span>${c.name}`, contC.get(c.k))).join("");
-  const countries = [...countryC.entries()].filter(([k]) => k).sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
-  const countryBoxes = countries.map(([k, n], i) => box("country", k, esc(k), n, i >= 8 ? ' data-extra="1"' : "")).join("");
-  const stageBoxes = STAGE_ORDER.filter((s) => stageC.get(s)).map((s) => box("stage", s, STAGE[s], stageC.get(s))).join("");
-  const sectorBoxes = [...sectorC.entries()].sort((a, b) => b[1] - a[1]).map(([k, n]) => box("sector", k, esc(k), n)).join("");
-  const conts = byContinent(rows);
-  const bar = conts.map((c) => `<a href="#" data-k="${c.k}" class="${c.dark ? "dark" : ""}" style="flex:${Math.max(c.v, total * 0.04) || 1};background:${c.color}" title="${c.name}"><b>${c.v ? usd(c.v) : "–"}</b><span>${c.name}</span></a>`).join("");
-  const body = `
-<div class="page">
-  <aside class="filters" aria-label="Filters">
-    <div class="hd">Filters <button type="button" id="f-clear">Clear</button></div>
-    <div class="fg"><h3>Continent</h3>${contBoxes}</div>
-    ${countries.length ? `<div class="fg"><h3>Market</h3>${countryBoxes}${countries.length > 8 ? '<button type="button" class="more-c" id="more-c">Show all markets</button>' : ""}</div>` : ""}
-    <div class="fg"><h3>Stage</h3>${stageBoxes}</div>
-    <div class="fg"><h3>Industry</h3>${sectorBoxes}</div>
-    <div class="fg"><h3>Amount</h3><select id="f-min" aria-label="Minimum amount"><option value="0">Any amount</option><option value="1000000">$1M and above</option><option value="5000000">$5M and above</option><option value="20000000">$20M and above</option><option value="100000000">$100M and above</option></select></div>
-    <div class="fg"><h3>Investor or company</h3><input type="search" id="f-q" placeholder="Search names" aria-label="Search investors or companies"></div>
-  </aside>
-  <div>
-    <div class="dayhead">
-      <div><div class="d">${longDate(day)}</div><h1 id="day-h" data-total="${rows.length}">${plural(rows.length, "round")}, ${usd(total) || "amounts not disclosed"}</h1></div>
-      <div class="acts"><a class="btn ghost" ${prev ? `href="/day/${prev}/"` : 'aria-disabled="true"'}>Previous day</a><a class="btn ghost" ${next ? `href="/day/${next}/"` : 'aria-disabled="true"'}>Next day</a></div>
-    </div>
-    <div class="bar" id="bar">${bar}</div>
-    <div class="chips"><span class="chip">Sorted by <b>amount</b></span><span class="chip" id="showing">Showing <b>all ${plural(rows.length, "round")}</b></span><button type="button" class="clear" id="chip-clear" hidden>Clear filters</button></div>
-    ${roundsTable(sorted, { filters: true })}
-    <p class="empty" id="none" hidden>No rounds match these filters.</p>
-  </div>
-</div>
-${joinBand()}`;
-  return shell({ title: `${longDate(day)}: ${plural(rows.length, "round")}, ${usd(total) || ""} | What Got Funded`, desc: `Every startup funding round announced on ${longDate(day)}, with investors, amounts and sources.`, active: "Today", body, canonical: `/day/${day}/`, scripts: BEEHIIV_SCRIPT });
+function homePage(day, rows, prev, next, isYesterday, hasEdition = false) {
+  const total = sum(rows.map((r) => r.amount_usd || 0));
+  const body = dayView(day, rows, { when: isYesterday ? "yesterday" : `on ${weekday(day)} ${dayMonth(day)}`, edition: hasEdition }) + joinBand();
+  return shell({ title: `What Got Funded: ${plural(rows.length, "startup")} raised ${usd(total) || ""} on ${dayMonth(day)}`, desc: `Every startup funding round announced on ${longDate(day)}, across all markets, with founders, investors and sources.`, active: "Today", body, canonical: "/", scripts: BEEHIIV_SCRIPT });
+}
+
+function dayPage(day, rows, prev, next, hasEdition = false) {
+  const total = sum(rows.map((r) => r.amount_usd || 0));
+  const nav = `<div class="wrap"><nav class="daynav2">${prev ? `<a href="/day/${prev}/">Previous day</a>` : "<span></span>"}${next ? `<a href="/day/${next}/">Next day</a>` : "<span></span>"}</nav></div>`;
+  const body = dayView(day, rows, { when: `on ${weekday(day)} ${dayMonth(day)}`, edition: hasEdition }) + nav + joinBand();
+  return shell({ title: `${longDate(day)}: ${plural(rows.length, "round")}, ${usd(total) || ""} | What Got Funded`, desc: `Every startup funding round announced on ${longDate(day)}, with founders, investors and sources.`, active: "Today", body, canonical: `/day/${day}/`, scripts: BEEHIIV_SCRIPT });
 }
 
 function companyPage(rs, all) {
@@ -323,53 +273,78 @@ function companyPage(rs, all) {
 
 function analysisPage(rows, from, to) {
   const disclosed = rows.filter((r) => r.amount_usd), total = sum(disclosed.map((r) => r.amount_usd));
-  const days = []; for (let d = from; d <= to; d = addDays(d, 1)) days.push(d);
-  const conts = byContinent(rows);
-  const byKey = (key) => { const m = new Map(); for (const r of rows) { const k = key(r); const e = m.get(k) || { k, n: 0, v: 0 }; e.n++; e.v += r.amount_usd || 0; m.set(k, e); } return [...m.values()]; };
-  const stages = byKey((r) => r.stage).sort((a, b) => STAGE_ORDER.indexOf(a.k) - STAGE_ORDER.indexOf(b.k));
-  const sectors = byKey((r) => r.sector || "Other").sort((a, b) => b.v - a.v).slice(0, 10);
-  const markets = byKey((r) => r.country || "").filter((m) => m.k).sort((a, b) => b.v - a.v);
-  const perDay = days.map((d) => { const rs = rows.filter((r) => r.announced_on === d); return { d, n: rs.length, v: sum(rs.map((r) => r.amount_usd || 0)) }; });
-  const maxDay = Math.max(...perDay.map((p) => p.v), 1);
-  const hbars = (items, label, color, max = Math.max(...items.map((i) => i.v), 1)) => items.map((i) => `<div class="hb"><span>${label(i)}</span><div class="track"><div class="fill" style="width:${(i.v / max) * 100}%;background:${color(i)}"></div></div><span class="num">${i.v ? usd(i.v) : "–"}</span></div>`).join("");
-  const invMap = new Map();
-  for (const r of rows) for (const [name, lead] of [...r.leads.map((n) => [n, true]), ...r.investors.map((n) => [n, false])]) {
-    const e = invMap.get(name) || { name, n: 0, leads: 0, cos: [] }; e.n++; if (lead) e.leads++; e.cos.push(r); invMap.set(name, e);
+  const days = [...new Set(rows.map((r) => r.announced_on))].sort();
+  const regs = byRegion(rows);
+  const group = (key, rs = rows) => { const m = new Map(); for (const r of rs) { const k = key(r); if (k == null) continue; const e = m.get(k) || { k, n: 0, v: 0, amts: [] }; e.n++; e.v += r.amount_usd || 0; if (r.amount_usd) e.amts.push(r.amount_usd); m.set(k, e); } return [...m.values()]; };
+  const pct = (x) => `${Math.round(x * 100)}%`;
+  const count = (v) => String(v);
+  const stageList = group((r) => r.stage).sort((a, b) => STAGE_ORDER.indexOf(a.k) - STAGE_ORDER.indexOf(b.k));
+  const sectors = group((r) => r.sector || "Not classified");
+  const countries = group((r) => r.country || "Not stated");
+  const cColor = (k) => { const r = rows.find((x) => (x.country || "Not stated") === k); return r ? contOf(r.cont).color : "var(--ink)"; };
+  const STAGE_COLORS = { pre_seed: "#90caf9", seed: "#42a5f5", series_a: "#1e88e5", series_b: "#3949ab", series_c: "#5e35b1", series_d: "#8e24aa", series_e: "#ad1457", series_f_plus: "#c62828", growth: "#ef6c00", strategic: "#00897b", undisclosed: "#b0bec5" };
+  const BANDS = [["Under $1M", 0, 1e6], ["$1M–5M", 1e6, 5e6], ["$5M–20M", 5e6, 2e7], ["$20M–50M", 2e7, 5e7], ["$50M–100M", 5e7, 1e8], ["$100M and above", 1e8, Infinity]];
+  // investors
+  const inv = new Map();
+  for (const r of rows) {
+    const leads = cleanInvestors(r.leads), others = cleanInvestors(r.investors).filter((n) => !leads.includes(n));
+    for (const [name, lead] of [...leads.map((n) => [n, true]), ...others.map((n) => [n, false])]) {
+      const e = inv.get(name) || { name, n: 0, led: 0, ledV: 0 }; e.n++; if (lead) { e.led++; e.ledV += r.amount_usd || 0; } inv.set(name, e);
+    }
   }
-  const invs = [...invMap.values()].sort((a, b) => b.n - a.n || b.leads - a.leads).slice(0, 9);
-  const top = [...rows].sort((a, b) => (b.amount_usd || 0) - (a.amount_usd || 0)).slice(0, 20);
-  const topMarket = markets[0];
-  const range = from.slice(5, 7) === to.slice(5, 7) ? `${Number(from.slice(8))}–${dayMonth(to)}` : `${dayMonth(from)}–${dayMonth(to)}`;
-  const body = `
-<section class="intro">
-  <div class="kind">Weekly data, ${range} ${to.slice(0, 4)}. Updated every morning.</div>
-  <h1>Startups announced ${plural(rows.length, "round")} and ${usd(total) || "undisclosed amounts"} in disclosed capital in the last seven days.</h1>
-  <p class="lede">Rounds announced between ${longDate(from)} and ${longDate(to)}, across all markets. ${disclosed.length} of ${rows.length} disclosed an amount; totals count disclosed amounts only.</p>
+  const invs = [...inv.values()];
+  const sortedAmt = disclosed.map((r) => r.amount_usd).sort((a, b) => b - a);
+  const top1 = sortedAmt[0] || 0, top5 = sum(sortedAmt.slice(0, 5));
+  const lang = (r) => { const s = firstSourceOf(r); const l = s && s.language ? String(s.language).slice(0, 2).toLowerCase() : "en"; return l === "en" ? "English" : "Local language"; };
+  const langs = group(lang);
+  const donut = (parts) => {
+    const t = sum(parts.map((p) => p.v)) || 1; let a = -Math.PI / 2;
+    const arcs = parts.filter((p) => p.v).map((p) => { const a2 = a + (p.v / t) * Math.PI * 2; const large = a2 - a > Math.PI ? 1 : 0;
+      const d = p.v === t ? `M60 10 A50 50 0 1 1 59.99 10 Z` : `M60 60 L${60 + 50 * Math.cos(a)} ${60 + 50 * Math.sin(a)} A50 50 0 ${large} 1 ${60 + 50 * Math.cos(a2)} ${60 + 50 * Math.sin(a2)} Z`; a = a2; return `<path d="${d}" fill="${p.color}"/>`; }).join("");
+    return `<div class="donut"><svg viewBox="0 0 120 120">${arcs}<circle cx="60" cy="60" r="30" fill="#fff"/></svg><div class="legend">${parts.map((p) => `<span><i style="background:${p.color}"></i>${esc(p.label)}: <b>${p.v}</b> (${pct(p.v / t)})</span>`).join("")}</div></div>`;
+  };
+  const coverage = [
+    ["Company website", rows.filter((r) => r.domain).length], ["Named founders", rows.filter((r) => cleanFounders(r.founders).length).length],
+    ["A founder's LinkedIn", rows.filter((r) => cleanFounders(r.founders).some((p) => p.linkedin_url)).length], ["Company LinkedIn", rows.filter((r) => r.linkedin_url).length],
+    ["Lead investor named", rows.filter((r) => r.leads.length).length], ["Amount disclosed", disclosed.length]];
+  const range = days.length > 1 ? `${dayMonth(days[0])} to ${dayMonth(days[days.length - 1])}` : dayMonth(days[0] || to);
+
+  const cards = [
+    chartCard("Capital by region", "Disclosed capital raised by startups in each region.", rankBars(regs.map((g) => ({ label: g.name, v: g.v, color: g.color, dot: true })))),
+    chartCard("Rounds by region", "Number of rounds announced, disclosed or not.", rankBars(regs.map((g) => ({ label: g.name, v: g.n, color: g.color, dot: true })), { fmt: count })),
+    chartCard("Top countries by capital", "Eight countries with the most disclosed capital.", rankBars(countries.filter((c) => c.v).sort((a, b) => b.v - a.v).slice(0, 8).map((c) => ({ label: c.k, v: c.v, color: cColor(c.k), dot: true })))),
+    chartCard("Most active countries", "Countries ranked by number of rounds.", rankBars(countries.sort((a, b) => b.n - a.n || b.v - a.v).slice(0, 8).map((c) => ({ label: c.k, v: c.n, color: cColor(c.k), dot: true })), { fmt: count })),
+    chartCard("Capital by stage", "Disclosed capital per funding stage.", rankBars(stageList.filter((s) => s.v).map((s) => ({ label: STAGE[s.k] || s.k, v: s.v, color: STAGE_COLORS[s.k] })))),
+    chartCard("Rounds by stage", "How many rounds were at each stage.", rankBars(stageList.map((s) => ({ label: STAGE[s.k] || s.k, v: s.n, color: STAGE_COLORS[s.k] })), { fmt: count })),
+    chartCard("Capital by industry", "Industries with the most disclosed capital.", rankBars(sectors.filter((s) => s.v).sort((a, b) => b.v - a.v).slice(0, 8).map((s) => ({ label: s.k, v: s.v, color: "#3d5afe" })))),
+    chartCard("Most active industries", "Industries ranked by number of rounds.", rankBars(sectors.sort((a, b) => b.n - a.n || b.v - a.v).slice(0, 8).map((s) => ({ label: s.k, v: s.n, color: "#00897b" })), { fmt: count })),
+    chartCard("Largest rounds", "The eight biggest disclosed rounds.", rankBars([...disclosed].sort((a, b) => b.amount_usd - a.amount_usd).slice(0, 8).map((r) => ({ label: r.company, v: r.amount_usd, color: contOf(r.cont).color, dot: true })))),
+    chartCard("Round sizes", "Disclosed rounds grouped by size.", rankBars(BANDS.map(([label, lo, hi]) => ({ label, v: disclosed.filter((r) => r.amount_usd >= lo && r.amount_usd < hi).length, color: "#172033" })), { fmt: count })),
+    chartCard("Median round by stage", "Typical disclosed round size at each stage.", rankBars(stageList.filter((s) => s.amts.length).map((s) => ({ label: `${STAGE[s.k] || s.k} (${s.amts.length})`, v: median(s.amts), color: STAGE_COLORS[s.k] })))),
+    chartCard("How concentrated was the money", "Share of disclosed capital taken by the largest rounds.", `<div class="bignum">${total ? pct(top5 / total) : "–"}<small>of disclosed capital went to the five largest rounds. The single largest took ${total ? pct(top1 / total) : "–"}.</small></div>` +
+      stackBars([{ label: "All capital", parts: [{ v: top1, color: "#172033", label: "Largest round" }, { v: top5 - top1, color: "#5c6bc0", label: "Next four" }, { v: total - top5, color: "#c5cae9", label: "Everything else" }] }],
+        [{ label: "Largest round", color: "#172033" }, { label: "Next four", color: "#5c6bc0" }, { label: "Everything else", color: "#c5cae9" }])),
+    chartCard("Disclosure by region", "Share of rounds in each region that stated an amount.", rankBars(regs.map((g) => ({ label: g.name, v: g.rows.filter((r) => r.amount_usd).length / g.n, color: g.color, dot: true, value: pct(g.rows.filter((r) => r.amount_usd).length / g.n) })), { max: 1 })),
+    chartCard("Stage mix by region", "Rounds in each region, split by stage.", stackBars(regs.map((g) => ({ label: g.name, parts: STAGE_ORDER.map((k) => ({ v: g.rows.filter((r) => r.stage === k).length, color: STAGE_COLORS[k], label: STAGE[k] })) })),
+      STAGE_ORDER.filter((k) => rows.some((r) => r.stage === k)).map((k) => ({ label: STAGE[k], color: STAGE_COLORS[k] })))),
+    chartCard("Most active investors", "Investors named in the most rounds. Counts only named investors, so they are a floor.", rankBars(invs.sort((a, b) => b.n - a.n || b.ledV - a.ledV).slice(0, 8).map((i) => ({ label: i.name, v: i.n, color: "#172033" })), { fmt: count })),
+    chartCard("Investors leading the most capital", "Disclosed size of the rounds each investor led.", rankBars(invs.filter((i) => i.ledV).sort((a, b) => b.ledV - a.ledV).slice(0, 8).map((i) => ({ label: i.name, v: i.ledV, color: "#ad1457" })))),
+    chartCard("Where rounds were first reported", "Language of the first report we found for each round.", donut(langs.map((l) => ({ label: l.k, v: l.n, color: l.k === "English" ? "#172033" : "#00897b" })))),
+    chartCard("What we know about each startup", "Share of startups for which each detail is public.", rankBars(coverage.map(([label, n]) => ({ label, v: n / (rows.length || 1), value: pct(n / (rows.length || 1)), color: "#3d5afe" })), { max: 1 })),
+  ];
+  if (days.length > 1) {
+    const perDay = days.map((d) => ({ label: shortDate(d), v: sum(rows.filter((r) => r.announced_on === d).map((r) => r.amount_usd || 0)), color: "#172033" }));
+    cards.unshift(chartCard("Capital day by day", "Disclosed capital per day of announcement.", rankBars(perDay), { wide: true }));
+  }
+  const body = `<div class="wrap">
+<section class="hero2"><p class="kick">Analysis · ${esc(range)} ${to.slice(0, 4)}</p>
+  <h1>Where the startup money went.</h1>
+  <p class="lede">${plural(rows.length, "round")} and ${usd(total) || "undisclosed amounts"} in disclosed capital, broken down by region, country, stage, industry and investor. Totals count disclosed amounts only. Written analysis of each trend follows as the data builds.</p>
+  <div class="stats"><div><span class="sv">${usd(total) || "–"}</span><span class="sl">disclosed capital</span></div><div><span class="sv">${rows.length}</span><span class="sl">rounds</span></div><div><span class="sv">${usd(median(disclosed.map((r) => r.amount_usd))) || "–"}</span><span class="sl">median disclosed round</span></div></div>
 </section>
-<div class="kpis">
-  <div><span class="num">${usd(total) || "–"}</span><small>Disclosed capital</small></div>
-  <div><span class="num">${rows.length}</span><small>Rounds</small></div>
-  <div><span class="num">${usd(median(disclosed.map((r) => r.amount_usd))) || "–"}</span><small>Median disclosed round</small></div>
-  <div><span class="num">${topMarket ? esc(topMarket.k) : "–"}</span><small>${topMarket ? `Largest market, ${usd(topMarket.v)}` : "Largest market"}</small></div>
-</div>
-<div class="charts">
-  <div><h2>Capital by continent</h2><div class="cap">Disclosed capital. Rounds with no stated country are shown as not stated.</div>
-    ${hbars(conts, (c) => `<span class="dot c-${c.k}"></span>${c.name}`, (c) => c.color)}</div>
-  <div><h2>Day by day</h2><div class="cap">Disclosed capital per day of announcement.</div>
-    <div class="cols">${perDay.map((p) => `<div style="height:${(p.v / maxDay) * 100}%" title="${longDate(p.d)}: ${plural(p.n, "round")}, ${usd(p.v) || "$0"}"><span>${p.n}</span></div>`).join("")}</div>
-    <div class="cl">${perDay.map((p) => `<span>${shortDate(p.d)}</span>`).join("")}</div>
-    <div class="cap" style="margin-top:10px">Numbers above each bar are round counts.</div></div>
-  <div><h2>Capital by stage</h2><div class="cap">Disclosed capital per stage.</div>
-    ${hbars(stages, (s) => `${STAGE[s.k]} <small>${s.n}</small>`, () => "var(--ink)")}</div>
-  <div><h2>Capital by industry</h2><div class="cap">Ten largest industries by disclosed capital.</div>
-    ${hbars(sectors, (s) => `${esc(s.k)} <small>${s.n}</small>`, () => "var(--apac)")}</div>
-</div>
-<section class="sec"><h2>The twenty largest rounds</h2>${roundsTable(top)}</section>
-<section class="sec"><h2>Most active investors</h2><div class="cap">Named investors in this week's rounds. Many reports do not name investors, so counts are a floor.</div>
-  <div class="inv">${invs.map((i) => `<div><span class="num">${i.n}</span><b>${esc(i.name)}</b><span>${i.cos.slice(0, 3).map((r) => `<a class="u" href="${r.href}">${esc(r.company)}</a>`).join(", ")}${i.leads ? `, ${plural(i.leads, "lead")}` : ""}</span></div>`).join("")}</div>
-</section>
-${joinBand()}`;
-  return shell({ title: `Startup funding, ${range}: ${plural(rows.length, "round")} | What Got Funded`, desc: `Weekly startup funding data: ${plural(rows.length, "round")} and ${usd(total) || ""} disclosed, by continent, stage and industry.`, active: "Analysis", body, canonical: "/analysis/", scripts: BEEHIIV_SCRIPT });
+<section class="block"><h2>The numbers in ${cards.length} charts</h2><div class="cgrid">${cards.join("\n")}</div></section>
+</div>${joinBand()}`;
+  return shell({ title: `Startup funding analysis, ${range} | What Got Funded`, desc: `Startup funding by region, country, stage, industry and investor: ${plural(rows.length, "round")} and ${usd(total) || ""} disclosed.`, active: "Analysis", body, canonical: "/analysis/", scripts: BEEHIIV_SCRIPT });
 }
 
 function investorsPage(rows, from, to) {
@@ -458,43 +433,41 @@ ${l.map((s) => `<tr><td><a class="u" href="${esc(s.homepage)}" rel="nofollow noo
 </tbody></table></details>`;
     }).join("\n");
 
-  const body = `<div class="narrow prose">
-<h1>About What Got Funded</h1>
-<p class="lede">What Got Funded curates startup funding news and analyses it. We collect funding rounds reported by news sources around the world, record each one in the same format, and analyse where the money is going by region, market, sector, stage and investor.</p>
-<p>We are not a private database and we do not run our own investigations. Every round on this site was reported publicly by a news source, and every entry links to the reports it came from.</p>
-
-<h2>Where the data comes from</h2>
-<p>We follow ${read.length} sources in ${markets} markets and ${langs.size} languages, listed in full below, plus ${searches} local-language news searches that pick up funding stories from outlets we do not follow directly. They include startup and technology publications, business newspapers, regional startup media, investor and accelerator news pages, and press-release wires.</p>
-<p>We read each source's public feed or funding section, only where the publisher's robots.txt allows it. We never collect paywalled content.</p>
-
-<h2>How we process it</h2>
-<ul>
-<li>Each funding story is read in full, whatever the language, and its details are recorded in English.</li>
-<li>From each story we take the company, what it does, where it is based, the amount and currency, the stage, the lead and other investors, and the founders, using only what the source states. Anything the source does not state is left blank.</li>
-<li>Amounts in other currencies are converted to US dollars at the European Central Bank's reference rate on the day.</li>
-<li>We add the company's official links (website, LinkedIn, X and careers page) so readers can find the company. The funding details themselves come only from the news reports.</li>
-</ul>
-
-<h2>How we curate it</h2>
-<ul>
-<li>The same round reported by several outlets becomes one entry, with every report listed as a source.</li>
-<li>We include equity rounds raised by startups and private growth companies: pre-seed, seed, Series A onwards, growth and strategic investments.</li>
-<li>We leave out debt, grants, funds raised by investors, IPOs, acquisitions, secondary sales, private equity buyouts, rumours and talks, old rounds reported again, and reports that do not name the company.</li>
-<li>Each round sits on the day it was announced.</li>
-</ul>
-
-<h2>How we analyse it</h2>
-<p>Once the day's rounds are curated, we analyse them: the total raised, the split by continent and market, the sectors and stages attracting money, the largest rounds and the most active investors. The daily edition covers each day's rounds; the weekly, monthly and longer analyses look at how funding is shifting over time.</p>
-
-<h2>What we may miss</h2>
-<p>Because we curate from news sources, our coverage is only as complete as the news. We capture as much as our sources report, and we will still miss some rounds. Some are never announced publicly. Some appear only on social media or in a press release no outlet picks up. Some are reported only behind a paywall. Some details, such as the amount or the investors, are never disclosed and stay blank here. A round can also appear a day or two late when the first coverage comes from a source we read later.</p>
-<p>If you know of a round we missed or got wrong, <a href="mailto:dev@hackrlife.com?subject=Missing%20or%20wrong%20round%20on%20What%20Got%20Funded">tell us</a> and we will add or fix it.</p>
-
-<h2>Our sources</h2>
-<p>Open a region to see every source we follow there.</p>
-</div>
+  const steps = [
+    ["Scraper", "Collects the day's funding news from every source and local-language search, for the previous day in Sydney time.", "Apify", "#f9a825"],
+    ["Structurer", "Reads each story in its own language and records the company, amount, stage, investors and founders in English.", "Claude Haiku", "#3d5afe"],
+    ["Verifier", "Finds the first public report of each round and opens the page to confirm its real publish date.", "Gemini + Google Search, Claude Sonnet", "#00897b"],
+    ["Curator", "Merges duplicates, removes old rounds and non-equity deals, and picks the stories that lead the day.", "Claude Sonnet", "#e53935"],
+    ["Article publisher", "Builds the daily edition: the charts, every startup as a card, and the free CSV download.", "Vercel", "#8e24aa"],
+    ["Newsletter publisher", "Prepares the morning email with the day's top 20 startups and a link to the full edition.", "Beehiiv", "#172033"],
+  ];
+  const pipe = `<div class="pipe" role="img" aria-label="The daily pipeline: six agents from scraping to newsletter">
+  <div class="orch"><span class="pill">n8n</span><span>One workflow runs the six agents every night at <b>9pm Sydney time</b>. Every round, source and check is stored in <b>Supabase</b>.</span></div>
+  <ol>${steps.map(([h, p, t, c], i) => `<li style="--c:${c}"><span class="n">STEP ${i + 1}</span><h3>${h}</h3><p>${p}</p><span class="tool">${t}</span></li>`).join("")}</ol>
+  <div class="out"><b style="color:var(--ink)">What comes out:</b><span>Daily edition on the site</span><span>Newsletter at 7am</span><span>CSV of every round</span><span>Analysis</span></div>
+</div>`;
+  const block = (k, c, h, inner, wide = false) => `<section class="pblock${wide ? " wide" : ""}" style="--c:${c}"><span class="pk"><i></i>${k}</span><h3>${h}</h3>${inner}</section>`;
+  const body = `<div class="wrap about2">
+<section class="hero2"><p class="kick">About</p>
+  <h1>We find every startup funding round and show where the money is going.</h1>
+  <p class="lede">What Got Funded curates startup funding news from around the world, records each round in the same format, and analyses it by region, market, sector, stage and investor.</p>
+  <p>We are not a private database and we do not run our own investigations. Every round on this site was reported publicly, and every entry links to the reports it came from.</p>
+  <div class="kpis2"><div><b>${read.length}</b><span>news sources</span></div><div><b>${searches}</b><span>local-language searches</span></div><div><b>${markets}</b><span>markets</span></div><div><b>${langs.size}</b><span>languages</span></div></div>
+</section>
+<section class="block"><h2>How it works</h2><p class="sub2">Six agents run in one automated pipeline, every night.</p>${pipe}</section>
+<section class="block"><h2>The process in detail</h2>
+<div class="pblocks">
+${block("1 · Collect", "#f9a825", "Where the data comes from", `<p>We follow ${read.length} sources in ${markets} markets and ${langs.size} languages, listed in full below, plus ${searches} local-language news searches that pick up funding stories from outlets we do not follow directly.</p><p>They include startup and technology publications, business newspapers, regional startup media, investor and accelerator news pages, and press-release wires. We read each source's public feed or funding section, only where the publisher's robots.txt allows it, and never collect paywalled content.</p>`)}
+${block("2 · Structure", "#3d5afe", "How we process it", `<ul><li>Each funding story is read in full, whatever the language, and its details are recorded in English.</li><li>We take the company, what it does, where it is based, the amount and currency, the stage, the lead and other investors, and the founders, using only what the source states. Anything not stated stays blank.</li><li>Amounts in other currencies are converted to US dollars at the European Central Bank's reference rate on the day.</li><li>We add the company's official links (website, LinkedIn, X, careers page). The funding details come only from the news reports.</li></ul>`)}
+${block("3 · Verify", "#00897b", "How we check the date", `<p>Many sites re-post older deals days or weeks later with a new date. A round belongs to the day it was first announced, in the publisher's local time, so every new round is checked before it is published.</p><ul><li>A search model finds the earliest public report of the round, in English and in the local language.</li><li>We then open that report ourselves and read its real publish date. The model's answer only counts if the page exists, names the company and carries that date.</li><li>Large or unclear rounds get a second, independent check. Rounds that cannot be confirmed are held back.</li></ul>`)}
+${block("4 · Curate", "#e53935", "How we curate it", `<ul><li>The same round reported by several outlets becomes one entry, with every report listed as a source.</li><li>We include equity rounds raised by startups and private growth companies: pre-seed, seed, Series A onwards, growth and strategic investments.</li><li>We leave out debt, grants, funds raised by investors, IPOs, acquisitions, secondary sales, private equity buyouts, rumours and talks, old rounds reported again, and reports that do not name the company.</li></ul>`)}
+${block("5 · Analyse", "#8e24aa", "How we analyse it", `<p>Once the day's rounds are curated, we analyse them: the total raised, the split by continent and market, the sectors and stages attracting money, the largest rounds and the most active investors.</p><p>The daily edition covers each day's rounds. The weekly, monthly and longer analyses look at how funding is shifting over time. Every day's data can be downloaded as a CSV, free.</p>`)}
+${block("6 · Limits", "#9aa3b2", "What we may miss", `<p>Our coverage is only as complete as the news. Some rounds are never announced publicly, appear only on social media, or are reported only behind a paywall. Some details, such as the amount or the investors, are never disclosed and stay blank here.</p><p>If you know of a round we missed or got wrong, <a href="mailto:dev@hackrlife.com?subject=Missing%20or%20wrong%20round%20on%20What%20Got%20Funded">tell us</a> and we will add or fix it.</p>`)}
+</div></section>
+<section class="block"><h2>Our sources</h2><p class="sub2">Open a region to see every source we follow there.</p>
 <div class="regcards">
 ${cards}
+</div></section>
 </div>`;
   return shell({ title: "About | What Got Funded", desc: `What Got Funded curates startup funding news from ${read.length} sources in ${markets} markets and analyses where the money is going.`, active: "About", body, canonical: "/about/" });
 }
@@ -518,6 +491,14 @@ function write(rel, content) {
 }
 
 async function main() {
+  {
+    const reg = path.join(ROOT, "..", "sources", "sources.csv"), q = path.join(ROOT, "..", "sources", "google-news-queries.csv");
+    if (fs.existsSync(reg)) {
+      const read = readCsv(reg).filter((s) => s.collection_method !== "manual_or_not_ingested" && s.homepage);
+      const searches = fs.existsSync(q) ? readCsv(q).length : 0;
+      SOURCES_LINE = `${read.length} news sources and ${searches} local-language news searches across ${new Set(read.map((s) => s.market)).size} markets`;
+    }
+  }
   const data = await loadData();
   // keep the feed for newsletter.mjs, which runs after the build (see vercel.json)
   if (process.env.WGF_SNAPSHOT_OUT) fs.writeFileSync(process.env.WGF_SNAPSHOT_OUT, JSON.stringify(data));
@@ -565,8 +546,11 @@ async function main() {
   const cards = [...editions].reverse();
   write("editions/index.html", shell({ title: "Daily editions | What Got Funded", desc: "Every day's startup funding, as one story with the four charts and every round.", active: "Editions",
     body: `<div class="narrow"><h1>Daily editions</h1><p class="sub">One story a day: the day's total, funding by region, top investors, funding by industry, then every startup that announced a round.</p></div><section class="edfeed list">${cards.map(editionCard).join("")}</section>`, canonical: "/editions/" }));
-  write("index.html", homePage(homeDay, byDay.get(homeDay), prevOf(homeDay), nextOf(homeDay), homeDay === yesterday, cards.slice(0, 1).map(editionCard).join("")));
-  for (const d of days) write(`day/${d}/index.html`, dayPage(d, byDay.get(d), prevOf(d), nextOf(d)));
+  write("index.html", homePage(homeDay, byDay.get(homeDay), prevOf(homeDay), nextOf(homeDay), homeDay === yesterday, edDays.includes(homeDay)));
+  for (const d of days) write(`day/${d}/index.html`, dayPage(d, byDay.get(d), prevOf(d), nextOf(d), edDays.includes(d)));
+  // free CSV downloads: one per day and one for everything published
+  for (const d of days) write(`data/${d}.csv`, roundsCsv(byDay.get(d), SITE_URL));
+  write("data/all-rounds.csv", roundsCsv(published, SITE_URL));
 
   const byCo = new Map();
   for (const r of published) { if (!byCo.has(r.company_id)) byCo.set(r.company_id, []); byCo.get(r.company_id).push(r); }

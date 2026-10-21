@@ -139,3 +139,40 @@
   }
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", ready); else ready();
 })();
+
+// ---------- startup lists: region chips and progressive loading (12 at a time, more on scroll) ----------
+(function () {
+  "use strict";
+  document.querySelectorAll(".list").forEach(function (list) {
+    var box = list.querySelector(".units"); if (!box) return;
+    var units = Array.prototype.slice.call(box.querySelectorAll(".unit"));
+    var page = Number(box.getAttribute("data-page")) || 12, shown = page, filter = "all";
+    var btn = list.querySelector(".more-btn"), chips = Array.prototype.slice.call(list.querySelectorAll(".chips button"));
+    function match(u) { return filter === "all" || u.getAttribute("data-c") === filter; }
+    function render() {
+      var n = 0, total = 0;
+      units.forEach(function (u) {
+        var ok = match(u); if (ok) total++;
+        if (ok && n < shown) { u.removeAttribute("data-hide"); n++; } else u.setAttribute("data-hide", "");
+      });
+      if (btn) { btn.hidden = n >= total; btn.textContent = "Show more startups (" + (total - n) + " more)"; }
+    }
+    function more() { shown += page; render(); }
+    if (btn) btn.addEventListener("click", more);
+    if ("IntersectionObserver" in window && btn) {
+      new IntersectionObserver(function (es) { es.forEach(function (e) { if (e.isIntersecting && !btn.hidden) more(); }); }, { rootMargin: "600px 0px" }).observe(btn);
+    }
+    function setFilter(f) {
+      filter = f; shown = page;
+      chips.forEach(function (c) { c.classList.toggle("on", c.getAttribute("data-f") === f); });
+      render();
+    }
+    chips.forEach(function (c) { c.addEventListener("click", function () { setFilter(c.getAttribute("data-f")); }); });
+    document.querySelectorAll(".tile[data-f]").forEach(function (t) {
+      t.addEventListener("click", function () { setFilter(t.getAttribute("data-f")); });
+    });
+    // a link to a specific startup (#r-123) reveals everything so the anchor exists
+    if (location.hash && /^#r-\d+$/.test(location.hash)) { shown = units.length; }
+    render();
+  });
+})();
