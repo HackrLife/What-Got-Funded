@@ -363,13 +363,71 @@ ${joinBand()}`;
   return shell({ title: "Most active startup investors, last 30 days | What Got Funded", desc: "Investors ranked by the number of startup rounds they joined in the last 30 days.", active: "Investors", body, canonical: "/investors/", scripts: BEEHIIV_SCRIPT });
 }
 
-function jobsPage(recent) {
-  const body = `
-<section class="intro"><h1>Jobs at startups that just raised.</h1>
-  <p class="lede">Open roles at companies funded in the last 90 days, each linking to the company's own careers page. Listings start with the next update; until then, here are the companies that raised most recently.</p></section>
-<section class="sec"><h2>Raised in the last seven days</h2>${roundsTable(recent.slice(0, 25))}</section>
-${joinBand()}`;
-  return shell({ title: "Jobs at newly funded startups | What Got Funded", desc: "Open roles at startups that raised funding in the last 90 days.", active: "Jobs", body, canonical: "/jobs/", scripts: BEEHIIV_SCRIPT });
+// ---------- jobs: key roles at just-funded and hot startups ----------
+const FN_LABEL = { engineering: "Engineering", marketing: "Marketing & growth", sales: "Sales & GTM", finance: "Finance", product: "Product", design: "Design",
+  devrel: "Developer relations", operations: "Operations", people: "People", customer: "Customer success", other: "Other" };
+const SEN_LABEL = { c_level: "C-level", vp: "VP", head: "Head of", director: "Director", lead: "Lead", ic: "" };
+function jobsCsv(jobs) {
+  const q = (v) => { const s = String(v ?? ""); return /[",\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s; };
+  const cols = ["company", "website", "raised_usd", "stage", "announced_on", "role", "function", "seniority", "founding", "remote", "fractional", "location", "posted_on", "apply_url"];
+  return "﻿" + [cols.join(","), ...jobs.map((j) => [j.company, j.domain ? `https://${j.domain}` : "", j.amount_usd ? Math.round(j.amount_usd) : "", STAGE[j.stage] || "", j.announced_on,
+    j.title, FN_LABEL[j.function] || "", SEN_LABEL[j.seniority] || "IC", j.founding ? "yes" : "", j.remote ? "yes" : "", j.fractional ? "yes" : "", j.location, j.posted_on, j.url].map(q).join(","))].join("\r\n") + "\r\n";
+}
+function jobsPage(allJobs, published, today, hrefOf) {
+  const since = (d, n) => d && d >= addDays(today, -n);
+  // only roles that matter: founding, leadership, remote or fractional, minus junior and generic roles (wgf-jobs sets key_role)
+  const jobs = allJobs.filter((j) => j.key_role);
+  const byCo = new Map();
+  for (const j of jobs) { if (!byCo.has(j.company_id)) byCo.set(j.company_id, []); byCo.get(j.company_id).push(j); }
+  const senior = (rs) => rs.filter((j) => ["c_level", "vp", "head", "director"].includes(j.seniority)).length;
+  const groups = [...byCo.values()].map((rs) => {
+    const j0 = rs[0];
+    const fresh = since(j0.announced_on, 30);
+    const hot = !fresh && (Number(j0.amount_usd) >= 2e7 || ["series_b", "series_c", "series_d", "series_e", "series_f_plus", "growth"].includes(j0.stage) || senior(rs) >= 5);
+    // just funded: roles opened around or after the round
+    const rows = fresh ? rs.filter((j) => !j.posted_on || j.posted_on >= addDays(j0.announced_on, -14)) : rs;
+    return { j0, rows: rows.sort((a, b) => b.score - a.score), tab: fresh ? "fresh" : hot ? "hot" : null };
+  }).filter((g) => g.tab && g.rows.length).sort((a, b) => (b.rows[0].score || 0) - (a.rows[0].score || 0));
+  const all = groups.flatMap((g) => g.rows.map((j) => ({ ...j, tab: g.tab })));
+  const keyToday = all.filter((j) => j.tab === "fresh").sort((a, b) => b.score - a.score).slice(0, 15);
+  const tags = (j) => [j.founding && "Founding", SEN_LABEL[j.seniority], j.remote && "Remote", j.fractional && "Fractional"].filter(Boolean);
+  const chip = (t) => `<span class="jtag t-${slugify(t)}">${esc(t)}</span>`;
+  const roleRow = (j, withCo = false) => `<li class="role" data-fn="${j.function}" data-tags="${[j.founding && "founding", j.remote && "remote", j.fractional && "fractional"].filter(Boolean).join(" ")}" data-tab="${j.tab}">
+    <div class="rt"><a class="rtitle" href="${esc(j.url)}" rel="noopener nofollow" target="_blank">${esc(j.title)}</a>${withCo ? `<span class="rco">at <a href="${hrefOf(j.company_id) || (j.domain ? `https://${j.domain}` : "#")}">${esc(j.company)}</a></span>` : ""}
+      <div class="rmeta">${tags(j).map(chip).join("")}<span>${esc(FN_LABEL[j.function] || "")}</span>${j.location ? `<span>${esc(j.location)}</span>` : ""}${j.posted_on ? `<span>Posted ${esc(shortDate(j.posted_on))}</span>` : ""}</div></div>
+    <a class="apply" href="${esc(j.url)}" rel="noopener nofollow" target="_blank">Apply</a></li>`;
+  const coCard = (g) => {
+    const j0 = g.j0, c = contOf(continentOf(j0.hq_country ? countryLabel(j0.hq_country) : null));
+    const raised = [usd(j0.amount_usd), STAGE[j0.stage] && STAGE[j0.stage] !== "Not stated" ? STAGE[j0.stage] : "", `announced ${shortDate(j0.announced_on)}`].filter(Boolean).join(" · ");
+    return `<article class="hco" data-tab="${g.tab}" style="--c:${c.color}">
+  <header><div><h3><a href="${hrefOf(j0.company_id) || (j0.domain ? `https://${j0.domain}` : "#")}">${esc(j0.company)}</a></h3><div class="hraised">Raised ${esc(raised)}${j0.hq_country ? ` · ${esc(countryLabel(j0.hq_country))}` : ""}</div></div>
+    <div class="hcount"><b>${g.rows.length}</b><span>key ${g.rows.length === 1 ? "role" : "roles"}</span></div></header>
+  ${j0.use_of_funds ? `<p class="why"><b>Why they're hiring</b>${esc(j0.use_of_funds)}</p>` : ""}
+  <ul class="roles">${g.rows.map((j) => roleRow(j)).join("")}</ul>
+</article>`;
+  };
+  const fnCounts = new Map(); for (const j of all) fnCounts.set(j.function, (fnCounts.get(j.function) || 0) + 1);
+  const fnChips = [`<button type="button" class="on" data-fn="all">All functions</button>`, ...Object.keys(FN_LABEL).filter((k) => fnCounts.get(k)).map((k) => `<button type="button" data-fn="${k}">${FN_LABEL[k]} ${fnCounts.get(k)}</button>`)].join("");
+  const nFresh = groups.filter((g) => g.tab === "fresh").length, nHot = groups.filter((g) => g.tab === "hot").length;
+  const empty = `<div class="jempty"><h3>Roles are being collected</h3><p>Every night we read the public job boards of every startup that raised in the last year and keep only the roles that shape a company: founding hires, leaders, and remote or fractional roles. The first roles appear after the next run.</p></div>`;
+  const body = `<div class="wrap jobs2">
+<section class="hero2"><p class="kick">Jobs</p>
+  <h1>The first hires at startups that just raised.</h1>
+  <p class="lede">Founding, leadership, remote and fractional roles at startups funded in the last 30 days, and at the year's hottest startups. Every role comes from the company's own job board and links straight to it.</p>
+  <div class="stats"><div><span class="sv">${all.length}</span><span class="sl">key roles open</span></div><div><span class="sv">${nFresh}</span><span class="sl">just-funded startups hiring</span></div><div><span class="sv">${all.filter((j) => j.founding).length}</span><span class="sl">founding roles</span></div></div>
+  <div class="acts"><a class="btn2" href="/data/jobs.csv" download>${ICON_DL}Download roles as CSV</a></div>
+</section>
+${all.length ? `
+<section class="block"><h2>Key roles today</h2><p class="sub2">The founding and leadership roles that just-funded startups opened most recently.</p><ul class="roles keyroles">${keyToday.map((j) => roleRow(j, true)).join("")}</ul></section>
+<section class="block jlist" id="board">
+  <div class="tabs" role="tablist"><button type="button" class="on" data-tab="fresh">Just funded <small>${nFresh}</small></button><button type="button" data-tab="hot">Hot startups <small>${nHot}</small></button></div>
+  <div class="chips fnchips">${fnChips}</div>
+  <div class="toggles"><label><input type="checkbox" value="founding">Founding</label><label><input type="checkbox" value="remote">Remote</label><label><input type="checkbox" value="fractional">Fractional</label></div>
+  <div class="hcos">${groups.map(coCard).join("\n")}</div>
+  <p class="jnone" hidden>No roles match these filters.</p>
+</section>` : empty}
+</div>${joinBand()}`;
+  return shell({ title: "Founding and leadership roles at newly funded startups | What Got Funded", desc: "Founding, leadership, remote and fractional roles at startups that just raised, straight from their own job boards.", active: "Jobs", body, canonical: "/jobs/", scripts: BEEHIIV_SCRIPT });
 }
 
 function methodologyPage() {
@@ -564,7 +622,11 @@ async function main() {
   write("analysis/index.html", analysisPage(week, weekFrom, homeDay));
   const monthFrom = addDays(homeDay, -29);
   write("investors/index.html", investorsPage(published.filter((r) => r.announced_on >= monthFrom), monthFrom, homeDay));
-  write("jobs/index.html", jobsPage([...week].sort((a, b) => b.announced_on.localeCompare(a.announced_on) || (b.amount_usd || 0) - (a.amount_usd || 0))));
+  {
+    const hrefs = new Map(published.map((r) => [r.company_id, r.href]));
+    write("jobs/index.html", jobsPage(data.jobs || [], published, today, (id) => hrefs.get(id)));
+    write("data/jobs.csv", jobsCsv((data.jobs || []).filter((j) => j.key_role)));
+  }
   write("about/index.html", aboutPage());
   write("methodology/index.html", methodologyPage());
   write("subscribe/index.html", subscribePage());

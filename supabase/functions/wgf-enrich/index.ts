@@ -77,7 +77,9 @@ function nameIn(text: string, name: string) {
 }
 const shortName = (name: string) => { const t = nameTokens(name); return t.length === 1 && t[0].length <= 6; };
 
-function pickCompanyProfile(kind: "li" | "x", c: Co, results: Result[]) {
+// A company profile is kept when its handle is the company's own domain name, or when the result shows the name
+// and also the company's domain, country or city (so a same-named company elsewhere is not picked).
+function pickCompanyProfile(kind: "li" | "x", c: Co & { city?: string | null }, results: Result[]) {
   for (const r of results.slice(0, 8)) {
     const u = String(r.url ?? ""), h = host(u);
     let handle = "";
@@ -87,14 +89,15 @@ function pickCompanyProfile(kind: "li" | "x", c: Co, results: Result[]) {
       const m = /^https?:\/\/(?:www\.|mobile\.)?(?:x|twitter)\.com\/([A-Za-z0-9_]{2,15})\/?(?:[?#].*)?$/i.exec(u);
       if (!m || ["i", "home", "search", "hashtag", "intent", "share"].includes(m[1].toLowerCase())) continue; handle = m[1];
     }
-    const title = String(r.title ?? ""), text = `${title} ${r.description ?? ""}`;
-    const slugMatch = norm(handle).replace(/ /g, "") === nameTokens(c.name).join("") || (c.domain && norm(handle).replace(/ /g, "") === label(c.domain).replace(/-/g, ""));
-    if (!nameIn(title, c.name) && !slugMatch) continue;
-    // generic short names must also show the domain, or the slug must be the name and the country appear
-    if (shortName(c.name)) {
-      const proof = (c.domain && norm(text).includes(norm(label(c.domain)))) || (slugMatch && c.country && norm(text).includes(norm(c.country)));
-      if (!proof && !(c.domain && slugMatch)) continue;
-    }
+    const title = String(r.title ?? ""), text = norm(`${title} ${r.description ?? ""}`);
+    const h0 = norm(handle).replace(/ /g, "");
+    const domLabel = c.domain ? label(c.domain).replace(/-/g, "") : "";
+    if (domLabel.length >= 4 && h0 === domLabel) return kind === "li" ? `https://www.linkedin.com/company/${handle}` : `https://x.com/${handle}`;
+    if (!nameIn(title, c.name)) continue;
+    const place = [c.country, c.city].filter(Boolean).map((x) => norm(x));
+    const proof = (domLabel.length >= 4 && text.includes(norm(label(c.domain)))) || place.some((p) => p && text.includes(p))
+      || (!c.country && nameTokens(c.name).length >= 2 && h0 === nameTokens(c.name).join(""));
+    if (!proof) continue;
     return kind === "li" ? `https://www.linkedin.com/company/${handle}` : `https://x.com/${handle}`;
   }
   return null;
@@ -140,7 +143,7 @@ async function save(body: Record<string, unknown>) {
     const [kind, field, a, b] = key.split(":");
     let found: string | null = null;
     if (kind === "co") {
-      const [c] = await sql`select id, coalesce(name_en, name) as name, domain, hq_country as country, linkedin_url, x_url from wgf.companies where id = ${Number(a)}`;
+      const [c] = await sql`select id, coalesce(name_en, name) as name, domain, hq_country as country, hq_city as city, linkedin_url, x_url from wgf.companies where id = ${Number(a)}`;
       if (!c) continue;
       if (field === "dom") {
         found = pickDomain(c as unknown as Co, results);

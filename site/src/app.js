@@ -176,3 +176,32 @@
     render();
   });
 })();
+
+// ---------- jobs board: tabs, function chips, founding/remote/fractional toggles ----------
+(function () {
+  "use strict";
+  var board = document.getElementById("board"); if (!board) return;
+  var tab = "fresh", fn = "all";
+  var tabs = [].slice.call(board.querySelectorAll(".tabs button")), chips = [].slice.call(board.querySelectorAll(".fnchips button"));
+  var toggles = [].slice.call(board.querySelectorAll(".toggles input")), cos = [].slice.call(board.querySelectorAll(".hco"));
+  var none = board.querySelector(".jnone");
+  function render() {
+    var want = toggles.filter(function (t) { return t.checked; }).map(function (t) { return t.value; }), shown = 0;
+    cos.forEach(function (co) {
+      var n = 0;
+      if (co.getAttribute("data-tab") === tab) {
+        [].slice.call(co.querySelectorAll(".role")).forEach(function (r) {
+          var tags = (r.getAttribute("data-tags") || "").split(" ");
+          var ok = (fn === "all" || r.getAttribute("data-fn") === fn) && want.every(function (w) { return tags.indexOf(w) >= 0; });
+          r.hidden = !ok; if (ok) n++;
+        });
+      }
+      co.hidden = n === 0; shown += n;
+    });
+    if (none) none.hidden = shown > 0;
+  }
+  tabs.forEach(function (b) { b.addEventListener("click", function () { tab = b.getAttribute("data-tab"); tabs.forEach(function (x) { x.classList.toggle("on", x === b); }); render(); }); });
+  chips.forEach(function (b) { b.addEventListener("click", function () { fn = b.getAttribute("data-fn"); chips.forEach(function (x) { x.classList.toggle("on", x === b); }); render(); }); });
+  toggles.forEach(function (t) { t.addEventListener("change", render); });
+  render();
+})();

@@ -9,7 +9,7 @@ import { workflow, node, trigger, expr, ifElse, switchCase, sticky } from '@n8n/
 //            Run-now setting "verifier_test" runs it in dry-run mode over the hand-checked gold set and scores it.
 // Agents 4–6 (Curator, Article publisher, Newsletter publisher) still run in the nightly scheduled Claude task until the
 // verifier scores at least 95% on the gold set.
-// Run now: edit the "Run-now settings" box (target_date, run = full | verify_only | verifier_test | links_only), then execute.
+// Run now: edit the "Run-now settings" box (target_date, run = full | verify_only | verifier_test | links_only | jobs_only), then execute.
 // The x-wgf-token value lives only in n8n; this export uses a placeholder.
 const FN = 'https://cxtcwslqzrzjaulqcvvu.supabase.co/functions/v1/wgf-extract';
 const TOKEN = '__WGF_TOKEN__';
@@ -65,7 +65,7 @@ const runSettings = node({
 });
 const route = switchCase({
   version: 3.2,
-  config: { name: 'What to run', parameters: { rules: { values: [{ outputKey: 'full', conditions: { options: { caseSensitive: true, leftValue: '', typeValidation: 'strict' }, conditions: [{ leftValue: expr('{{ $json.run }}'), operator: { type: 'string', operation: 'equals' }, rightValue: 'full' }], combinator: 'and' } }, { outputKey: 'verify_only', conditions: { options: { caseSensitive: true, leftValue: '', typeValidation: 'strict' }, conditions: [{ leftValue: expr('{{ $json.run }}'), operator: { type: 'string', operation: 'equals' }, rightValue: 'verify_only' }], combinator: 'and' } }, { outputKey: 'verifier_test', conditions: { options: { caseSensitive: true, leftValue: '', typeValidation: 'strict' }, conditions: [{ leftValue: expr('{{ $json.run }}'), operator: { type: 'string', operation: 'equals' }, rightValue: 'verifier_test' }], combinator: 'and' } }, { outputKey: 'links_only', conditions: { options: { caseSensitive: true, leftValue: '', typeValidation: 'strict' }, conditions: [{ leftValue: expr('{{ $json.run }}'), operator: { type: 'string', operation: 'equals' }, rightValue: 'links_only' }], combinator: 'and' } }] } } },
+  config: { name: 'What to run', parameters: { rules: { values: [{ outputKey: 'full', conditions: { options: { caseSensitive: true, leftValue: '', typeValidation: 'strict' }, conditions: [{ leftValue: expr('{{ $json.run }}'), operator: { type: 'string', operation: 'equals' }, rightValue: 'full' }], combinator: 'and' } }, { outputKey: 'verify_only', conditions: { options: { caseSensitive: true, leftValue: '', typeValidation: 'strict' }, conditions: [{ leftValue: expr('{{ $json.run }}'), operator: { type: 'string', operation: 'equals' }, rightValue: 'verify_only' }], combinator: 'and' } }, { outputKey: 'verifier_test', conditions: { options: { caseSensitive: true, leftValue: '', typeValidation: 'strict' }, conditions: [{ leftValue: expr('{{ $json.run }}'), operator: { type: 'string', operation: 'equals' }, rightValue: 'verifier_test' }], combinator: 'and' } }, { outputKey: 'links_only', conditions: { options: { caseSensitive: true, leftValue: '', typeValidation: 'strict' }, conditions: [{ leftValue: expr('{{ $json.run }}'), operator: { type: 'string', operation: 'equals' }, rightValue: 'links_only' }], combinator: 'and' } }, { outputKey: 'jobs_only', conditions: { options: { caseSensitive: true, leftValue: '', typeValidation: 'strict' }, conditions: [{ leftValue: expr('{{ $json.run }}'), operator: { type: 'string', operation: 'equals' }, rightValue: 'jobs_only' }], combinator: 'and' } }] } } },
 });
 const RUN = "($('Run-now settings').isExecuted ? $('Run-now settings').first().json.run : 'full')";
 
@@ -468,7 +468,10 @@ for (const i of $input.all()) {
   const q = i.json.searchQuery && i.json.searchQuery.term;
   if (q) byQuery[q] = (i.json.organicResults || []).slice(0, 8).map(r => ({ url: r.url, title: r.title, description: r.description }));
 }
-return [{ json: { items: qs.map(q => ({ key: q.key, query: q.query, results: byQuery[q.query] || [] })) } }];`,
+const items = qs.map(q => ({ key: q.key, query: q.query, results: byQuery[q.query] || [] }));
+const out = [];
+for (let i = 0; i < items.length; i += 40) out.push({ json: { items: items.slice(i, i + 40) } });   // 40 per save call: well inside the function time limit
+return out.length ? out : [{ json: { items: [] } }];`,
     },
   },
 });
@@ -477,11 +480,35 @@ const saveLinks = node({
   version: 4.4,
   config: {
     name: 'Save links',
+    onError: 'continueRegularOutput',
     parameters: {
       method: 'POST', url: ENRICH, sendHeaders: true, headerParameters: headers,
       sendBody: true, contentType: 'json', specifyBody: 'json',
       jsonBody: expr('{{ JSON.stringify({ mode: "save", items: $json.items }) }}'),
-      options: { timeout: 300000, ...lenient },
+      options: { timeout: 160000, batching: { batch: { batchSize: 1, batchInterval: 500 } }, ...lenient },
+    },
+  },
+});
+
+// ---------- Agent 2c: Jobs ----------
+// Open roles from each funded company's own public hiring system (Greenhouse, Lever, Ashby, Workable, SmartRecruiters, Recruitee).
+// wgf-jobs handles 8 companies a call; 25 calls cover up to 200 companies a night. Boards are found once a week, roles refreshed daily.
+const JOBS = 'https://cxtcwslqzrzjaulqcvvu.supabase.co/functions/v1/wgf-jobs';
+const jobBatches = node({
+  type: 'n8n-nodes-base.code',
+  version: 2,
+  config: { name: 'Job batches', executeOnce: true, alwaysOutputData: true, parameters: { mode: 'runOnceForAllItems', jsCode: `return Array.from({ length: 25 }, (_, i) => ({ json: { batch: i + 1 } }));` } },
+});
+const findJobs = node({
+  type: 'n8n-nodes-base.httpRequest',
+  version: 4.4,
+  config: {
+    name: 'Find jobs',
+    onError: 'continueRegularOutput',
+    parameters: {
+      method: 'POST', url: JOBS, sendHeaders: true, headerParameters: headers,
+      sendBody: true, contentType: 'json', specifyBody: 'json', jsonBody: '{ "mode": "run", "limit": 8 }',
+      options: { timeout: 150000, batching: { batch: { batchSize: 1, batchInterval: 500 } }, ...lenient },
     },
   },
 });
@@ -668,6 +695,9 @@ Stores articles, extracts each round as JSON (Claude Haiku), finds and reads com
 sticky(`## Agent 2b · Link finder
 Google searches for each missing company website, company LinkedIn and X, and founder LinkedIn and X. A link is kept only when the result names the person and the company.`,
   [linkTargets, anyLinks, startLinkSearch, waitLinks, linkSearchDone, getLinks, matchLinks, saveLinks], { color: 3 });
+sticky(`## Agent 2c · Jobs
+Open roles from each funded company's own hiring system. Tags each role by function and seniority, and marks founding, remote and fractional roles.`,
+  [jobBatches, findJobs], { color: 2 });
 sticky(`## Agent 3 · Verifier
 Gemini Flash + Google Search checks each round was first announced on the day. Big or unclear rounds get a Claude Sonnet second opinion. Test mode scores it on the hand-checked gold set.`,
   [geminiTargets, geminiSplit, anyGemini, gemini, saveGemini, claudeTargets, claudeSplit, anyClaude, claudeCheck, saveClaude, verified, isTest, scorePipeline, scoreGemini], { color: 6 });
@@ -681,7 +711,8 @@ export default workflow('wgf-daily', 'WGF — Daily pipeline (9pm)')
     .onCase(0, startCrawl)
     .onCase(1, geminiTargets)
     .onCase(2, geminiTargets)
-    .onCase(3, linkTargets))
+    .onCase(3, linkTargets)
+    .onCase(4, jobBatches))
   .add(schedule)
   .to(is9pm)
   .to(nightly)
@@ -707,7 +738,9 @@ export default workflow('wgf-daily', 'WGF — Daily pipeline (9pm)')
   .to(saveDomains)
   .to(recheck)
   .to(linkTargets)
-  .to(anyLinks.onTrue(startLinkSearch.to(waitLinks.to(linkSearchDone.to(getLinks.to(matchLinks.to(saveLinks)))))))
+  .to(anyLinks.onTrue(startLinkSearch.to(waitLinks.to(linkSearchDone.to(getLinks.to(matchLinks.to(saveLinks.to(jobBatches))))))).onFalse(jobBatches))
+  .add(jobBatches)
+  .to(findJobs)
   .add(recheck)
   .to(hasDomains)
   .to(readSites)
