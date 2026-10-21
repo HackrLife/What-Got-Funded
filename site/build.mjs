@@ -11,7 +11,7 @@ import { fileURLToPath } from "node:url";
 import { CONTINENTS, continentOf, countryLabel } from "./src/regions.mjs";
 import { editionModel, articleBody, editionCard } from "./src/edition.mjs";
 // Daily editions start with the 18 October 2026 issue. Headline overrides: data/editions.json { "YYYY-MM-DD": { "headline": "...", "dek": "..." } }
-const EDITION_START = "2026-10-18";
+const EDITION_START = "2026-10-19";
 
 const ROOT = path.dirname(fileURLToPath(import.meta.url));
 const OUT = path.join(ROOT, "dist");
@@ -519,6 +519,8 @@ function write(rel, content) {
 
 async function main() {
   const data = await loadData();
+  // keep the feed for newsletter.mjs, which runs after the build (see vercel.json)
+  if (process.env.WGF_SNAPSHOT_OUT) fs.writeFileSync(process.env.WGF_SNAPSHOT_OUT, JSON.stringify(data));
   const today = process.env.BUILD_TODAY || sydneyDate();
   const yesterday = addDays(today, -1);
 
@@ -533,7 +535,10 @@ async function main() {
     if (!usedSlugs.has(r.company_id)) usedSlugs.set(r.company_id, `${slugify(r.company) || "company"}-${r.company_id}`);
     r.href = `/company/${usedSlugs.get(r.company_id)}/`;
   }
-  const published = rounds.filter((r) => r.announced_on < today);
+  // data/editions.json "_published": only the editions that have been checked and released are on the site
+  const editionCfg = fs.existsSync(path.join(ROOT, "data", "editions.json")) ? JSON.parse(fs.readFileSync(path.join(ROOT, "data", "editions.json"), "utf8")) : {};
+  const released = Array.isArray(editionCfg._published) ? new Set(editionCfg._published) : null;
+  const published = rounds.filter((r) => r.announced_on < today && (!released || released.has(r.announced_on)));
   const byDay = new Map();
   for (const r of published) { if (!byDay.has(r.announced_on)) byDay.set(r.announced_on, []); byDay.get(r.announced_on).push(r); }
   const days = [...byDay.keys()].sort();

@@ -71,7 +71,7 @@ export function editionModel(day, rows, { continents, override = {} } = {}) {
   const byRegion = continents.map((c) => {
     const rs = rounds.filter((r) => r.cont === c.k);
     return { k: c.k, name: c.k === "unknown" ? "Region not stated" : c.name, color: c.color, n: rs.length, v: sum(rs.map((r) => r.amount_usd || 0)), rows: rs };
-  }).filter((g) => g.n).sort((a, b) => b.v - a.v || b.n - a.n);
+  }).filter((g) => g.n).sort((a, b) => (a.k === "unknown") - (b.k === "unknown") || b.v - a.v || b.n - a.n);
 
   const sectors = new Map();
   for (const r of rounds) { const k = r.sector || "Other"; const e = sectors.get(k) || { name: k, n: 0, v: 0 }; e.n++; e.v += r.amount_usd || 0; sectors.set(k, e); }
@@ -209,12 +209,12 @@ export function startupBlock(r, { level = "h4", companyHref = null } = {}) {
     co ? ["Company", co] : null,
   ].filter(Boolean).map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`).join("");
   return `<article class="su" id="r-${r.id}">
-  <${level}>${companyHref ? `<a href="${companyHref}">${esc(r.company)}</a>` : esc(r.company)}</${level}>
+  <div class="su-top"><${level}>${companyHref ? `<a href="${companyHref}">${esc(r.company)}</a>` : esc(r.company)}</${level}><span class="chip"><b class="num">${esc(f.amount)}</b> ${esc(f.stage)}</span></div>
   ${f.what ? `<p class="what">${esc(f.what)}</p>` : ""}
-  ${f.story ? `<p>${esc(f.story)}</p>` : ""}
   ${f.unique ? `<p class="uq"><b>What stands out:</b> ${esc(f.unique)}</p>` : ""}
   <dl>${dl}</dl>
   ${founders ? `<div class="fd"><b>Founders</b><ul>${founders}</ul></div>` : ""}
+  ${f.story ? `<details class="story"><summary>The story</summary><p>${esc(f.story)}</p></details>` : ""}
   ${firstSource(r) ? `<p class="srcs">Announced ${esc(shortDay(r.announced_on))}. First reported by ${firstSource(r)}${(r.sources || []).length > 1 ? `. Also: ${srcs.split(" · ").slice(1).join(" · ")}` : ""}</p>` : ""}
 </article>`;
 }
@@ -227,7 +227,7 @@ export function articleBody(m, { prev, next, countryLabel = (x) => x } = {}) {
     for (const r of g.rows) { const k = r.country || "Country not stated"; if (!byCountry.has(k)) byCountry.set(k, []); byCountry.get(k).push(r); }
     const subs = [...byCountry.entries()].sort((a, b) => sum(b[1].map((r) => r.amount_usd || 0)) - sum(a[1].map((r) => r.amount_usd || 0)) || b[1].length - a[1].length)
       .map(([country, rs]) => `<section class="ctry"><h3>${esc(country)} <small>${plural(rs.length, "round")}${sum(rs.map((r) => r.amount_usd || 0)) ? `, ${usd(sum(rs.map((r) => r.amount_usd || 0)))}` : ""}</small></h3>
-${rs.map((r) => startupBlock(r, { companyHref: r.href })).join("\n")}</section>`).join("\n");
+<div class="cards">${rs.map((r) => startupBlock(r, { companyHref: r.href })).join("\n")}</div></section>`).join("\n");
     return `<section class="reg" id="reg-${g.k}" style="--c:${g.color}"><h2>${esc(g.name)} <small>${plural(g.n, "round")}${g.v ? `, ${usd(g.v)}` : ""}</small></h2>\n${subs}</section>`;
   }).join("\n");
   return `<article class="ed">
