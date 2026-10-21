@@ -122,7 +122,8 @@ const checkOf = (k: Record<string, any>): Check => ({
 });
 
 // The one decision rule, used for live runs and for scoring. status null = undecided (Gemini: wait for Claude).
-function decide(checker: string, c: Check, amount: number, day: string, geminiVerdict: string | null): { status: string | null; newDay: string | null } {
+// gemini = Gemini's latest check of the same round (for Claude's decision); it only counts against Claude when its page checked out.
+function decide(checker: string, c: Check, amount: number, day: string, gemini: Check | null): { status: string | null; newDay: string | null } {
   const big = amount >= BIG;
   if (checker === "gemini") {
     // Gemini's dates are only trusted when the page it cites really carries that date and names the company
@@ -136,8 +137,9 @@ function decide(checker: string, c: Check, amount: number, day: string, geminiVe
   if (c.notEquity) return { status: "not_venture", newDay: null };
   if (c.verdict === "EARLIER" && c.earliest && c.earliest < day && c.conf >= 0.6) return { status: "missed_window", newDay: null };
   if (c.verdict === "LATER" && c.earliest && c.earliest > day) return { status: "live", newDay: c.earliest };
-  if (c.verdict === "ON_DAY" && (!geminiVerdict || geminiVerdict === "ON_DAY" || geminiVerdict === "NOT_FOUND")) return { status: "live", newDay: null };
-  return { status: "unverified", newDay: null };   // the two checkers disagree: held for a human look
+  const geminiAgainst = gemini && gemini.pageOk && ["EARLIER", "LATER"].includes(gemini.verdict);
+  if (c.verdict === "ON_DAY" && c.conf >= 0.7 && !geminiAgainst) return { status: "live", newDay: null };
+  return { status: "unverified", newDay: null };   // unsure, or the two checkers disagree: held for a human look
 }
 
 // The model's final text, from a Gemini or Anthropic response (or plain text)
@@ -213,15 +215,16 @@ async function save(body: Record<string, unknown>) {
   await sql`insert into wgf.round_checks (round_id, checker, model, day, verdict, earliest_date, earliest_url, is_equity_round, confidence, notes, dry_run, raw, page_date, page_ok, page_note)
             values (${roundId}, ${checker}, ${String(body.model ?? "")}, ${day}, ${verdict}, ${earliest}, ${v?.earliest_url ?? null},
                     ${typeof v?.is_equity_round === "boolean" ? v.is_equity_round : null}, ${conf}, ${v?.notes ? String(v.notes).slice(0, 300) : null}, ${dry},
-                    ${sql.json({ text: text.slice(0, 4000) })}, ${isDate(page.date) ? page.date : null}, ${page.ok}, ${page.note})`;
+                    ${sql.json({ text: text.slice(0, 4000), usage: (body.usage ?? null) as any })}, ${isDate(page.date) ? page.date : null}, ${page.ok}, ${page.note})`;
   if (dry || r.status !== "pending_check" || verdict === "ERROR") return { round_id: roundId, verdict, status: r.status };
 
-  let geminiVerdict: string | null = null;
+  let gemini: Check | null = null;
   if (checker !== "gemini") {
-    const [g] = await sql`select verdict from wgf.round_checks where round_id = ${roundId} and checker = 'gemini' and not dry_run order by created_at desc limit 1`;
-    geminiVerdict = g?.verdict ?? null;
+    const [g] = await sql`select verdict, earliest_date::text as earliest, confidence, is_equity_round, page_ok from wgf.round_checks
+                          where round_id = ${roundId} and checker = 'gemini' and not dry_run order by created_at desc limit 1`;
+    gemini = g ? checkOf(g) : null;
   }
-  const { status, newDay } = decide(checker, checkOf({ verdict, earliest, confidence: conf, is_equity_round: v?.is_equity_round, page_ok: page.ok }), Number(r.amount_usd ?? 0), day, geminiVerdict);
+  const { status, newDay } = decide(checker, checkOf({ verdict, earliest, confidence: conf, is_equity_round: v?.is_equity_round, page_ok: page.ok }), Number(r.amount_usd ?? 0), day, gemini);
   if (status) {
     await sql`update wgf.rounds set status = ${status}, wire_checked_at = now(),
                 announced_on = coalesce(${newDay}::date, announced_on), week = case when ${newDay}::date is null then week else wgf.week_of(${newDay}::date) end,
@@ -272,7 +275,7 @@ async function score(body: Record<string, unknown>) {
     let d = decide("gemini", checkOf(gk), amount, g.day, null);
     if (!d.status) {
       const ck = cla.get(Number(g.round_id));
-      if (ck) { d = decide("claude", checkOf(ck), amount, g.day, gk.verdict); byClaude++; } else open++;
+      if (ck) { d = decide("claude", checkOf(ck), amount, g.day, checkOf(gk)); byClaude++; } else open++;
     }
     const label = d.status ? (d.newDay ? `live ${d.newDay}` : d.status === "live" ? "live on day" : d.status) : "waiting for Claude";
     outcome[`${g.truth} -> ${label.startsWith("live 20") ? "moved to later day" : label}`] = (outcome[`${g.truth} -> ${label.startsWith("live 20") ? "moved to later day" : label}`] ?? 0) + 1;
