@@ -9,7 +9,7 @@ import { workflow, node, trigger, expr, ifElse, switchCase, sticky } from '@n8n/
 //            Run-now setting "verifier_test" runs it in dry-run mode over the hand-checked gold set and scores it.
 // Agents 4–6 (Curator, Article publisher, Newsletter publisher) still run in the nightly scheduled Claude task until the
 // verifier scores at least 95% on the gold set.
-// Run now: edit the "Run-now settings" box (target_date, run = full | verify_only | verifier_test), then execute.
+// Run now: edit the "Run-now settings" box (target_date, run = full | verify_only | verifier_test | links_only), then execute.
 // The x-wgf-token value lives only in n8n; this export uses a placeholder.
 const FN = 'https://cxtcwslqzrzjaulqcvvu.supabase.co/functions/v1/wgf-extract';
 const TOKEN = '__WGF_TOKEN__';
@@ -65,7 +65,7 @@ const runSettings = node({
 });
 const route = switchCase({
   version: 3.2,
-  config: { name: 'What to run', parameters: { rules: { values: [{ outputKey: 'full', conditions: { options: { caseSensitive: true, leftValue: '', typeValidation: 'strict' }, conditions: [{ leftValue: expr('{{ $json.run }}'), operator: { type: 'string', operation: 'equals' }, rightValue: 'full' }], combinator: 'and' } }, { outputKey: 'verify_only', conditions: { options: { caseSensitive: true, leftValue: '', typeValidation: 'strict' }, conditions: [{ leftValue: expr('{{ $json.run }}'), operator: { type: 'string', operation: 'equals' }, rightValue: 'verify_only' }], combinator: 'and' } }, { outputKey: 'verifier_test', conditions: { options: { caseSensitive: true, leftValue: '', typeValidation: 'strict' }, conditions: [{ leftValue: expr('{{ $json.run }}'), operator: { type: 'string', operation: 'equals' }, rightValue: 'verifier_test' }], combinator: 'and' } }] } } },
+  config: { name: 'What to run', parameters: { rules: { values: [{ outputKey: 'full', conditions: { options: { caseSensitive: true, leftValue: '', typeValidation: 'strict' }, conditions: [{ leftValue: expr('{{ $json.run }}'), operator: { type: 'string', operation: 'equals' }, rightValue: 'full' }], combinator: 'and' } }, { outputKey: 'verify_only', conditions: { options: { caseSensitive: true, leftValue: '', typeValidation: 'strict' }, conditions: [{ leftValue: expr('{{ $json.run }}'), operator: { type: 'string', operation: 'equals' }, rightValue: 'verify_only' }], combinator: 'and' } }, { outputKey: 'verifier_test', conditions: { options: { caseSensitive: true, leftValue: '', typeValidation: 'strict' }, conditions: [{ leftValue: expr('{{ $json.run }}'), operator: { type: 'string', operation: 'equals' }, rightValue: 'verifier_test' }], combinator: 'and' } }, { outputKey: 'links_only', conditions: { options: { caseSensitive: true, leftValue: '', typeValidation: 'strict' }, conditions: [{ leftValue: expr('{{ $json.run }}'), operator: { type: 'string', operation: 'equals' }, rightValue: 'links_only' }], combinator: 'and' } }] } } },
 });
 const RUN = "($('Run-now settings').isExecuted ? $('Run-now settings').first().json.run : 'full')";
 
@@ -377,6 +377,115 @@ const saveSites = node({
   },
 });
 
+// ---------- Agent 2b: Link finder ----------
+// Google searches (Apify) for each missing company website, company LinkedIn/X and founder LinkedIn/X.
+// wgf-enrich builds the queries and keeps a link only when the result's title carries the name (and the company, for people).
+const ENRICH = 'https://cxtcwslqzrzjaulqcvvu.supabase.co/functions/v1/wgf-enrich';
+const linkTargets = node({
+  type: 'n8n-nodes-base.httpRequest',
+  version: 4.4,
+  config: {
+    name: 'Links to find', executeOnce: true,
+    parameters: {
+      method: 'POST', url: ENRICH, sendHeaders: true, headerParameters: headers,
+      sendBody: true, contentType: 'json', specifyBody: 'json',
+      jsonBody: expr(`{{ JSON.stringify({ mode: "targets", days: ${RUN} === "links_only" ? 5 : 3 }) }}`),
+      options: { timeout: 60000, ...lenient },
+    },
+  },
+});
+const anyLinks = ifElse({
+  version: 2.2,
+  config: {
+    name: 'Any links to find',
+    parameters: {
+      conditions: {
+        options: { caseSensitive: true, leftValue: '', typeValidation: 'loose' },
+        conditions: [{ leftValue: expr('{{ $json.count }}'), rightValue: 0, operator: { type: 'number', operation: 'gt' } }],
+        combinator: 'and',
+      },
+    },
+  },
+});
+const startLinkSearch = node({
+  type: 'n8n-nodes-base.httpRequest',
+  version: 4.4,
+  config: {
+    name: 'Start link search',
+    onError: 'continueRegularOutput',
+    parameters: {
+      method: 'POST', url: 'https://api.apify.com/v2/acts/apify~google-search-scraper/runs?timeout=2400', ...apify,
+      sendBody: true, contentType: 'json', specifyBody: 'json',
+      jsonBody: expr('{{ JSON.stringify({ queries: $json.queries.map(q => q.query).join(String.fromCharCode(10)), maxPagesPerQuery: 1, countryCode: "us", languageCode: "en", saveHtmlToKeyValueStore: false, includeIcons: false }) }}'),
+      options: { timeout: 60000, response: { response: { responseFormat: 'json' } } },
+    },
+    credentials: apifyCred,
+  },
+});
+const waitLinks = node({
+  type: 'n8n-nodes-base.wait',
+  version: 1.1,
+  config: { name: 'Wait for link search', parameters: { resume: 'timeInterval', amount: 20, unit: 'minutes' } },
+});
+const linkSearchDone = node({
+  type: 'n8n-nodes-base.httpRequest',
+  version: 4.4,
+  config: {
+    name: 'Link search finished',
+    onError: 'continueRegularOutput',
+    parameters: {
+      method: 'GET', ...apify,
+      url: expr("https://api.apify.com/v2/actor-runs/{{ $('Start link search').first().json.data.id }}?waitForFinish=60"),
+      options: { timeout: 90000, response: { response: { responseFormat: 'json' } } },
+    },
+    credentials: apifyCred,
+  },
+});
+const getLinks = node({
+  type: 'n8n-nodes-base.httpRequest',
+  version: 4.4,
+  config: {
+    name: 'Load link results',
+    onError: 'continueRegularOutput',
+    parameters: {
+      method: 'GET', ...apify,
+      url: expr("https://api.apify.com/v2/datasets/{{ $('Start link search').first().json.data.defaultDatasetId }}/items?clean=true&format=json&fields=searchQuery,organicResults"),
+      options: { timeout: 120000, response: { response: { responseFormat: 'json' } } },
+    },
+    credentials: apifyCred,
+  },
+});
+const matchLinks = node({
+  type: 'n8n-nodes-base.code',
+  version: 2,
+  config: {
+    name: 'Match link results',
+    parameters: {
+      mode: 'runOnceForAllItems',
+      jsCode: `const qs = $('Links to find').first().json.queries || [];
+const byQuery = {};
+for (const i of $input.all()) {
+  const q = i.json.searchQuery && i.json.searchQuery.term;
+  if (q) byQuery[q] = (i.json.organicResults || []).slice(0, 8).map(r => ({ url: r.url, title: r.title, description: r.description }));
+}
+return [{ json: { items: qs.map(q => ({ key: q.key, query: q.query, results: byQuery[q.query] || [] })) } }];`,
+    },
+  },
+});
+const saveLinks = node({
+  type: 'n8n-nodes-base.httpRequest',
+  version: 4.4,
+  config: {
+    name: 'Save links',
+    parameters: {
+      method: 'POST', url: ENRICH, sendHeaders: true, headerParameters: headers,
+      sendBody: true, contentType: 'json', specifyBody: 'json',
+      jsonBody: expr('{{ JSON.stringify({ mode: "save", items: $json.items }) }}'),
+      options: { timeout: 300000, ...lenient },
+    },
+  },
+});
+
 // ---------- Agent 3: Verifier ----------
 const VERIFY = 'https://cxtcwslqzrzjaulqcvvu.supabase.co/functions/v1/wgf-verify';
 
@@ -556,6 +665,9 @@ Apify crawler over ~300 sources for yesterday in Sydney (or the Run-now target_d
 sticky(`## Agent 2 · Structurer
 Stores articles, extracts each round as JSON (Claude Haiku), finds and reads company websites.`,
   [getArticles, chunkArticles, ingest, plan, split, buildPrompt, claude, saveRounds, targets, findDomains, waitSearch, getSearch, matchDomains, saveDomains, recheck, hasDomains, readSites, collectSites, saveSites], { color: 5 });
+sticky(`## Agent 2b · Link finder
+Google searches for each missing company website, company LinkedIn and X, and founder LinkedIn and X. A link is kept only when the result names the person and the company.`,
+  [linkTargets, anyLinks, startLinkSearch, waitLinks, linkSearchDone, getLinks, matchLinks, saveLinks], { color: 3 });
 sticky(`## Agent 3 · Verifier
 Gemini Flash + Google Search checks each round was first announced on the day. Big or unclear rounds get a Claude Sonnet second opinion. Test mode scores it on the hand-checked gold set.`,
   [geminiTargets, geminiSplit, anyGemini, gemini, saveGemini, claudeTargets, claudeSplit, anyClaude, claudeCheck, saveClaude, verified, isTest, scorePipeline, scoreGemini], { color: 6 });
@@ -568,7 +680,8 @@ export default workflow('wgf-daily', 'WGF — Daily pipeline (9pm)')
   .to(route
     .onCase(0, startCrawl)
     .onCase(1, geminiTargets)
-    .onCase(2, geminiTargets))
+    .onCase(2, geminiTargets)
+    .onCase(3, linkTargets))
   .add(schedule)
   .to(is9pm)
   .to(nightly)
@@ -593,6 +706,9 @@ export default workflow('wgf-daily', 'WGF — Daily pipeline (9pm)')
   .to(matchDomains)
   .to(saveDomains)
   .to(recheck)
+  .to(linkTargets)
+  .to(anyLinks.onTrue(startLinkSearch.to(waitLinks.to(linkSearchDone.to(getLinks.to(matchLinks.to(saveLinks)))))))
+  .add(recheck)
   .to(hasDomains)
   .to(readSites)
   .to(collectSites)
