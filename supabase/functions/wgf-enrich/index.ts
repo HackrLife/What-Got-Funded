@@ -58,7 +58,11 @@ async function targets(body: Record<string, unknown>) {
     if (!p.linkedin_url) add(`p:li:${p.id}:${p.cid}`, `site:linkedin.com/in ${quoted(name)} ${company ? quoted(company) : ""}`.trim());
     if (!p.x_url) add(`p:x:${p.id}:${p.cid}`, `site:x.com ${quoted(name)} ${company}`.trim());
   }
-  return { days, count: q.length, queries: q.slice(0, 400) };
+  // most useful first: founder LinkedIn, company LinkedIn, website, company X, founder X
+  const rank = (k: string) => ["p:li", "co:li", "co:dom", "co:x", "p:x"].indexOf(k.split(":").slice(0, 2).join(":"));
+  q.sort((x, y) => rank(x.key) - rank(y.key));
+  const limit = Math.min(Math.max(Number(body.limit) || 400, 1), 600);
+  return { days, count: q.length, queries: q.slice(0, limit) };
 }
 
 // ---------- matching ----------
