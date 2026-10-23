@@ -551,7 +551,8 @@ const collectBoards = node({
     parameters: {
       mode: 'runOnceForAllItems',
       jsCode: `const qs = $('One search per company').all();
-const items = $input.all().map((r, i) => ({ company_id: qs[i] && qs[i].json.company_id, organic: (r.json.organic || []).map(o => ({ link: o.link, title: o.title, snippet: o.snippet })) })).filter(x => x.company_id);
+// a failed search (no organic list) is skipped, so the company is searched again next run
+const items = $input.all().map((r, i) => ({ company_id: qs[i] && qs[i].json.company_id, ok: Array.isArray(r.json.organic), organic: (r.json.organic || []).map(o => ({ link: o.link, title: o.title, snippet: o.snippet })) })).filter(x => x.company_id && x.ok).map(x => ({ company_id: x.company_id, organic: x.organic }));
 const out = [];
 for (let i = 0; i < items.length; i += 15) out.push({ json: { items: items.slice(i, i + 15) } });   // 15 companies per save call
 return out.length ? out : [{ json: { items: [] } }];`,
