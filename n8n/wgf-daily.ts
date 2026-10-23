@@ -491,23 +491,101 @@ const saveLinks = node({
 });
 
 // ---------- Agent 2c: Jobs ----------
-// Open roles from each funded company's own public hiring system (Greenhouse, Lever, Ashby, Workable, SmartRecruiters, Recruitee).
-// wgf-jobs handles 8 companies a call; 25 calls cover up to 200 companies a night. Boards are found once a week, roles refreshed daily.
+// 1. One Google search (Serper) per company finds its job board on Ashby, Greenhouse, Lever, Workable, SmartRecruiters, Recruitee or Personio.
+//    Each company is searched at most once every 30 days; wgf-jobs keeps a board only when it belongs to the company.
+// 2. Every known board's public feed is read once a day for open roles (20 companies a call).
 const JOBS = 'https://cxtcwslqzrzjaulqcvvu.supabase.co/functions/v1/wgf-jobs';
+const serperCred = { httpHeaderAuth: { id: 'VWIAhIiT5qDScXNy', name: 'Serper API' } };
+const boardTargets = node({
+  type: 'n8n-nodes-base.httpRequest',
+  version: 4.4,
+  config: {
+    name: 'Boards to find', executeOnce: true,
+    parameters: {
+      method: 'POST', url: JOBS, sendHeaders: true, headerParameters: headers,
+      sendBody: true, contentType: 'json', specifyBody: 'json',
+      jsonBody: expr(`{{ JSON.stringify({ mode: "targets", limit: ${RUN} === "jobs_only" ? 200 : 60 }) }}`),
+      options: { timeout: 60000, ...lenient },
+    },
+  },
+});
+const anyBoards = ifElse({
+  version: 2.2,
+  config: {
+    name: 'Any boards to find',
+    parameters: {
+      conditions: {
+        options: { caseSensitive: true, leftValue: '', typeValidation: 'loose' },
+        conditions: [{ leftValue: expr('{{ $json.count }}'), rightValue: 0, operator: { type: 'number', operation: 'gt' } }],
+        combinator: 'and',
+      },
+    },
+  },
+});
+const boardQueries = node({
+  type: 'n8n-nodes-base.code',
+  version: 2,
+  config: { name: 'One search per company', parameters: { mode: 'runOnceForAllItems', jsCode: `return ($input.first().json.queries || []).map(q => ({ json: q }));` } },
+});
+const searchBoards = node({
+  type: 'n8n-nodes-base.httpRequest',
+  version: 4.4,
+  config: {
+    name: 'Search job boards (Serper)',
+    onError: 'continueRegularOutput',
+    parameters: {
+      method: 'POST', url: 'https://google.serper.dev/search',
+      authentication: 'genericCredentialType', genericAuthType: 'httpHeaderAuth',
+      sendBody: true, contentType: 'json', specifyBody: 'json',
+      jsonBody: expr('{{ JSON.stringify({ q: $json.q, num: 10 }) }}'),
+      options: { timeout: 30000, batching: { batch: { batchSize: 5, batchInterval: 1000 } }, ...lenient },
+    },
+    credentials: serperCred,
+  },
+});
+const collectBoards = node({
+  type: 'n8n-nodes-base.code',
+  version: 2,
+  config: {
+    name: 'Collect board results',
+    parameters: {
+      mode: 'runOnceForAllItems',
+      jsCode: `const qs = $('One search per company').all();
+const items = $input.all().map((r, i) => ({ company_id: qs[i] && qs[i].json.company_id, organic: (r.json.organic || []).map(o => ({ link: o.link, title: o.title, snippet: o.snippet })) })).filter(x => x.company_id);
+const out = [];
+for (let i = 0; i < items.length; i += 15) out.push({ json: { items: items.slice(i, i + 15) } });   // 15 companies per save call
+return out.length ? out : [{ json: { items: [] } }];`,
+    },
+  },
+});
+const saveBoards = node({
+  type: 'n8n-nodes-base.httpRequest',
+  version: 4.4,
+  config: {
+    name: 'Save boards',
+    onError: 'continueRegularOutput',
+    parameters: {
+      method: 'POST', url: JOBS, sendHeaders: true, headerParameters: headers,
+      sendBody: true, contentType: 'json', specifyBody: 'json',
+      jsonBody: expr('{{ JSON.stringify({ mode: "boards", items: $json.items }) }}'),
+      options: { timeout: 150000, batching: { batch: { batchSize: 1, batchInterval: 500 } }, ...lenient },
+    },
+  },
+});
 const jobBatches = node({
   type: 'n8n-nodes-base.code',
   version: 2,
-  config: { name: 'Job batches', executeOnce: true, alwaysOutputData: true, parameters: { mode: 'runOnceForAllItems', jsCode: `return Array.from({ length: 25 }, (_, i) => ({ json: { batch: i + 1 } }));` } },
+  config: { name: 'Job batches', executeOnce: true, alwaysOutputData: true, parameters: { mode: 'runOnceForAllItems', jsCode: `return Array.from({ length: 15 }, (_, i) => ({ json: { batch: i + 1 } }));` } },
 });
 const findJobs = node({
   type: 'n8n-nodes-base.httpRequest',
   version: 4.4,
   config: {
-    name: 'Find jobs',
+    name: 'Refresh open roles',
     onError: 'continueRegularOutput',
     parameters: {
       method: 'POST', url: JOBS, sendHeaders: true, headerParameters: headers,
-      sendBody: true, contentType: 'json', specifyBody: 'json', jsonBody: '{ "mode": "run", "limit": 8 }',
+      sendBody: true, contentType: 'json', specifyBody: 'json', jsonBody: '{ "mode": "run", "limit": 20 }',
       options: { timeout: 150000, batching: { batch: { batchSize: 1, batchInterval: 500 } }, ...lenient },
     },
   },
@@ -696,8 +774,8 @@ sticky(`## Agent 2b · Link finder
 Google searches for each missing company website, company LinkedIn and X, and founder LinkedIn and X. A link is kept only when the result names the person and the company.`,
   [linkTargets, anyLinks, startLinkSearch, waitLinks, linkSearchDone, getLinks, matchLinks, saveLinks], { color: 3 });
 sticky(`## Agent 2c · Jobs
-Open roles from each funded company's own hiring system. Tags each role by function and seniority, and marks founding, remote and fractional roles.`,
-  [jobBatches, findJobs], { color: 2 });
+One Google search (Serper) per company finds its job board. Each board's public feed is then read daily. Tags each role by function and seniority, and marks founding, remote and fractional roles.`,
+  [boardTargets, anyBoards, boardQueries, searchBoards, collectBoards, saveBoards, jobBatches, findJobs], { color: 2 });
 sticky(`## Agent 3 · Verifier
 Gemini Flash + Google Search checks each round was first announced on the day. Big or unclear rounds get a Claude Sonnet second opinion. Test mode scores it on the hand-checked gold set.`,
   [geminiTargets, geminiSplit, anyGemini, gemini, saveGemini, claudeTargets, claudeSplit, anyClaude, claudeCheck, saveClaude, verified, isTest, scorePipeline, scoreGemini], { color: 6 });
@@ -712,7 +790,7 @@ export default workflow('wgf-daily', 'WGF — Daily pipeline (9pm)')
     .onCase(1, geminiTargets)
     .onCase(2, geminiTargets)
     .onCase(3, linkTargets)
-    .onCase(4, jobBatches))
+    .onCase(4, boardTargets))
   .add(schedule)
   .to(is9pm)
   .to(nightly)
@@ -738,7 +816,9 @@ export default workflow('wgf-daily', 'WGF — Daily pipeline (9pm)')
   .to(saveDomains)
   .to(recheck)
   .to(linkTargets)
-  .to(anyLinks.onTrue(startLinkSearch.to(waitLinks.to(linkSearchDone.to(getLinks.to(matchLinks.to(saveLinks.to(jobBatches))))))).onFalse(jobBatches))
+  .to(anyLinks.onTrue(startLinkSearch.to(waitLinks.to(linkSearchDone.to(getLinks.to(matchLinks.to(saveLinks.to(boardTargets))))))).onFalse(boardTargets))
+  .add(boardTargets)
+  .to(anyBoards.onTrue(boardQueries.to(searchBoards.to(collectBoards.to(saveBoards.to(jobBatches))))).onFalse(jobBatches))
   .add(jobBatches)
   .to(findJobs)
   .add(recheck)

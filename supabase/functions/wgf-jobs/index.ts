@@ -1,19 +1,22 @@
 // What Got Funded — jobs agent (n8n section 2c)
 //
 // POST /functions/v1/wgf-jobs   (header: x-wgf-token)
-//   { "mode": "run", "limit"?: 12 }
-//     → takes the next companies that raised in the last 365 days, finds their public hiring system (Greenhouse, Lever,
-//       Ashby, Workable, SmartRecruiters, Recruitee) and stores their open roles with function, seniority and tags.
-//       Hiring systems are looked up once a week per company; roles are refreshed once a day.
+//   { "mode": "targets", "limit"?: 60 }
+//     → companies that raised in the last 365 days and have no known job board, each with one web-search query that
+//       looks for the company on the public job-board hosts. Each company is searched at most once every 30 days.
+//   { "mode": "boards", "items": [{ "company_id": 1, "organic": [{ "link", "title", "snippet" }] }] }
+//     → reads the board links in each company's search results, opens the board's public feed and keeps it only when
+//       the board belongs to the company. Stores the board and its open roles.
+//   { "mode": "run", "limit"?: 20 }
+//     → refreshes the open roles of every known board once a day (plus boards linked from a company's careers page).
 //
 // Only each company's own public job feed is read: the same feed the company embeds on its careers page.
-// A board is accepted only when its name, or its postings, name the company.
 
 import postgres from "npm:postgres@3.4.4";
 
 const sql = postgres(Deno.env.get("SUPABASE_DB_URL")!, { prepare: false, max: 1, idle_timeout: 5 });
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json" } });
-const norm = (s: unknown) => String(s ?? "").toLowerCase().normalize("NFKD").replace(/[̀-ͯ]/g, "").replace(/[^a-z0-9]+/g, " ").trim();
+const norm = (s: unknown) => String(s ?? "").toLowerCase().normalize("NFKD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, " ").trim();
 const UA = { "user-agent": "WhatGotFundedBot/1.0 (+https://whatgotfunded.com/about/)", accept: "application/json" };
 
 type Job = { external_id: string; title: string; team?: string | null; location?: string | null; remote?: boolean; employment_type?: string | null; posted_on?: string | null; url: string; text?: string };
@@ -68,25 +71,38 @@ const ATS: Record<string, (slug: string) => Promise<Board | null>> = {
     return { source: "recruitee", slug, name: d.offers[0]?.company_name ?? null, jobs: d.offers.map((j: any) => ({ external_id: `rc-${j.id}`, title: j.title, team: j.department ?? null,
       location: j.location ?? null, remote: j.remote === true, employment_type: j.employment_type_code ?? null, posted_on: day(j.published_at ?? j.created_at), url: j.careers_url, text: strip(j.description) })) };
   },
+  async personio(slug) {
+    let x = "";
+    try { const r = await fetch(`https://${slug}.jobs.personio.de/xml?language=en`, { headers: { "user-agent": UA["user-agent"] }, signal: AbortSignal.timeout(10000) }); if (!r.ok) return null; x = await r.text(); } catch { return null; }
+    if (!/<workzag-jobs|<position>/i.test(x)) return null;
+    const tag = (b: string, t: string) => { const m = new RegExp(`<${t}>(?:<!\\[CDATA\\[)?([\\s\\S]*?)(?:\\]\\]>)?</${t}>`, "i").exec(b); return m ? m[1].trim() : null; };
+    const jobs = [...x.matchAll(/<position>([\s\S]*?)<\/position>/gi)].map((m) => {
+      const b = m[1], id = tag(b, "id");
+      return { external_id: `ps-${id}`, title: tag(b, "name") ?? "", team: tag(b, "department"), location: tag(b, "office"), employment_type: tag(b, "employmentType") ?? tag(b, "schedule"),
+        posted_on: day(tag(b, "createdAt")), url: `https://${slug}.jobs.personio.de/job/${id}`, text: strip(tag(b, "value")) };
+    }).filter((j) => j.external_id !== "ps-null");
+    return { source: "personio", slug, jobs };
+  },
 };
 
-// Slugs to try: an explicit ATS link on the careers page first, then the company's domain label and name.
-function candidates(c: { name: string; domain: string | null; careers_url: string | null }) {
-  const out: [string, string][] = [];
-  const cu = String(c.careers_url ?? "");
-  const m = /(?:boards|job-boards)(?:\.eu)?\.greenhouse\.io\/(?:embed\/job_board\?for=)?([\w-]+)/i.exec(cu) ? ["greenhouse", /greenhouse\.io\/(?:embed\/job_board\?for=)?([\w-]+)/i.exec(cu)![1]]
-    : /jobs\.lever\.co\/([\w-]+)/i.exec(cu) ? ["lever", /jobs\.lever\.co\/([\w-]+)/i.exec(cu)![1]]
-    : /jobs\.ashbyhq\.com\/([\w.-]+)/i.exec(cu) ? ["ashby", /jobs\.ashbyhq\.com\/([\w.-]+)/i.exec(cu)![1]]
-    : /apply\.workable\.com\/([\w-]+)/i.exec(cu) ? ["workable", /apply\.workable\.com\/([\w-]+)/i.exec(cu)![1]]
-    : /jobs\.smartrecruiters\.com\/([\w-]+)/i.exec(cu) ? ["smartrecruiters", /jobs\.smartrecruiters\.com\/([\w-]+)/i.exec(cu)![1]]
-    : /([\w-]+)\.recruitee\.com/i.exec(cu) ? ["recruitee", /([\w-]+)\.recruitee\.com/i.exec(cu)![1]] : null;
-  if (m) out.push([m[0], m[1]]);
-  const label = c.domain ? c.domain.replace(/^(www|app)\./, "").split(".")[0] : "";
-  const words = norm(c.name.replace(/\(.*?\)/g, "")).split(" ").filter((w) => w && !["inc", "ltd", "llc", "the", "ai", "co"].includes(w) || /^ai$/.test(w) && false);
-  const slugs = [...new Set([label, words.join(""), words.join("-"), norm(c.name).replace(/ /g, "")].filter((s) => s && s.length >= 3))];
-  for (const s of slugs) for (const src of Object.keys(ATS)) out.push([src, s]);
-  return out;
+// A job-board link → [hiring system, board name]. Works for search-result links and careers-page links.
+const BAD_SLUG = /^(embed|api|v1|jobs|job|careers|search|www|app|login|signin|en|de|fr)$/i;
+function atsFromUrl(u: unknown): [string, string] | null {
+  const url = String(u ?? "");
+  const pats: [string, RegExp][] = [
+    ["greenhouse", /(?:job-boards|boards)(?:\.eu)?\.greenhouse\.io\/(?:embed\/job_board\?for=)?([\w-]+)/i],
+    ["lever", /\/\/jobs\.lever\.co\/([\w.-]+)/i],
+    ["ashby", /jobs\.ashbyhq\.com\/([\w.%-]+)/i],
+    ["workable", /apply\.workable\.com\/([\w-]+)/i],
+    ["smartrecruiters", /(?:jobs|careers)\.smartrecruiters\.com\/([\w-]+)/i],
+    ["recruitee", /\/\/([\w-]+)\.recruitee\.com/i],
+    ["personio", /\/\/([\w-]+)\.jobs\.personio\.(?:de|com)/i],
+  ];
+  for (const [src, re] of pats) { const m = re.exec(url); if (m && !BAD_SLUG.test(m[1])) return [src, decodeURIComponent(m[1])]; }
+  return null;
 }
+const compact = (s: unknown) => norm(s).replace(/ /g, "");
+const cleanName = (n: string) => norm(n.replace(/\(.*?\)/g, "")).replace(/\b(inc|ltd|llc|limited|gmbh|pte|pty|corp|corporation|technologies|labs)\b/g, "").trim();
 
 // The board belongs to this company: its name matches, or a posting names the company or its domain.
 function owns(b: Board, c: { name: string; domain: string | null }) {
@@ -154,50 +170,103 @@ async function storeBoard(c: Record<string, any>, b: Board) {
   return jobs.length;
 }
 
-async function run(body: Record<string, unknown>) {
-  const limit = Math.min(Math.max(Number(body.limit) || 8, 1), 20);
-  // companies with a live round in the last 365 days; each needs a lookup (weekly) or a refresh (daily)
-  const cos = await sql`
-    with latest as (
-      select distinct on (r.company_id) r.company_id, r.id as round_id, r.stage, r.amount_usd, r.announced_on
-      from wgf.rounds r where r.status = 'live' and r.announced_on >= current_date - 365
-      order by r.company_id, r.announced_on desc)
-    select c.id, coalesce(c.name_en, c.name) as name, c.domain, c.careers_url, l.round_id, l.stage, l.amount_usd, l.announced_on, a.source, a.slug, a.checked_at, a.fetched_at
-    from latest l join wgf.companies c on c.id = l.company_id left join wgf.company_ats a on a.company_id = c.id
+const LATEST = () => sql`
+  select distinct on (r.company_id) r.company_id, r.id as round_id, r.stage, r.amount_usd, r.announced_on
+  from wgf.rounds r where r.status = 'live' and r.announced_on >= current_date - 365
+  order by r.company_id, r.announced_on desc`;
+
+// Companies to search for: no known board, not searched in the last 30 days. Newest rounds first.
+async function targets(body: Record<string, unknown>) {
+  const limit = Math.min(Math.max(Number(body.limit) || 60, 1), 300);
+  const hosts = ["jobs.ashbyhq.com", "boards.greenhouse.io", "job-boards.greenhouse.io", "jobs.lever.co", "apply.workable.com", "jobs.smartrecruiters.com", "recruitee.com", "jobs.personio.de"];
+  const rows = await sql`
+    with latest as (${LATEST()})
+    select c.id, coalesce(c.name_en, c.name) as name, c.domain from latest l join wgf.companies c on c.id = l.company_id
+    left join wgf.company_ats a on a.company_id = c.id
     where coalesce(c.name_en, c.name) !~* '(unnamed|undisclosed|stealth)'
-      and ((a.company_id is null) or (a.source is null and a.checked_at < now() - interval '7 days') or (a.source is not null and coalesce(a.fetched_at, 'epoch') < now() - interval '20 hours'))
-    order by (a.company_id is null) desc, l.announced_on desc limit ${limit}`;
+      and (a.company_id is null or (a.source is null and coalesce(a.searched_at, 'epoch') < now() - interval '30 days'))
+    order by l.announced_on desc, l.amount_usd desc nulls last limit ${limit}`;
+  const queries = rows.map((c) => {
+    const name = String(c.name).replace(/\(.*?\)/g, "").replace(/"/g, "").trim();
+    return { company_id: Number(c.id), name, q: `"${name}" (${hosts.map((h) => `site:${h}`).join(" OR ")})` };
+  });
+  return { count: queries.length, queries };
+}
+
+// Read board links from each company's search results; keep a board only when it belongs to the company.
+async function boards(body: Record<string, unknown>) {
+  const items = Array.isArray(body.items) ? body.items.slice(0, 40) : [];
   let found = 0, roles = 0, none = 0;
-  for (const c of cos) {
-    let board: Board | null = null;
-    if (c.source && c.slug) board = await ATS[c.source](c.slug);
-    else {
-      // an explicit careers-page link first, then every hiring system in parallel for each candidate slug
-      const cands = candidates(c as never);
-      const bySlug = new Map<string, string[]>();
-      for (const [src, slug] of cands) bySlug.set(slug, [...(bySlug.get(slug) ?? []), src]);
-      for (const [slug, srcs] of bySlug) {
-        const boards = await Promise.all(srcs.map((src) => ATS[src](slug)));
-        board = boards.find((b) => b && b.jobs.length && owns(b, c as never)) ?? null;
-        if (board) break;
-      }
+  const out: unknown[] = [];
+  await Promise.all(items.map(async (it: any) => {
+    const id = Number(it.company_id);
+    const [c] = await sql`
+      with latest as (${LATEST()})
+      select c.id, coalesce(c.name_en, c.name) as name, c.domain, l.round_id, l.stage, l.amount_usd from wgf.companies c join latest l on l.company_id = c.id where c.id = ${id}`;
+    if (!c) return;
+    const name = cleanName(c.name), label = c.domain ? compact(String(c.domain).replace(/^(www|app)\./, "").split(".")[0]) : "";
+    // candidate boards, in search-rank order, with whether the result's title names the company
+    const seen = new Set<string>(), cands: { src: string; slug: string; titled: boolean }[] = [];
+    for (const r of (Array.isArray(it.organic) ? it.organic : []).slice(0, 10)) {
+      const a = atsFromUrl(r.link);
+      if (!a || seen.has(a.join(":"))) continue;
+      seen.add(a.join(":"));
+      cands.push({ src: a[0], slug: a[1], titled: name.length >= 2 && ` ${norm(`${r.title} ${r.snippet ?? ""}`)} `.includes(` ${name} `) });
     }
-    if (board) {
-      roles += await storeBoard(c, board); found++;
-      await sql`insert into wgf.company_ats (company_id, source, slug, checked_at, fetched_at) values (${c.id}, ${board.source}, ${board.slug}, now(), now())
-                on conflict (company_id) do update set source = excluded.source, slug = excluded.slug, checked_at = now(), fetched_at = now()`;
+    let hit: { b: Board; why: string } | null = null;
+    for (const k of cands.slice(0, 4)) {
+      const b = await ATS[k.src](k.slug);
+      if (!b) continue;
+      const slugMatch = [compact(name), label].filter((x) => x.length >= 3).some((x) => compact(k.slug) === x || (compact(k.slug).startsWith(x) && /^(hq|inc|ai|app|io|co|tech|labs|careers|jobs|global|group)$/.test(compact(k.slug).slice(x.length))));
+      if (b.jobs.length && owns(b, c as never)) { hit = { b, why: "board names the company" }; break; }
+      if (k.titled && slugMatch) { hit = { b, why: "search title and board name match" }; break; }
+    }
+    if (hit) {
+      found++;
+      roles += await storeBoard(c, hit.b);
+      await sql`insert into wgf.company_ats (company_id, source, slug, checked_at, fetched_at, searched_at, found_via, note)
+                values (${c.id}, ${hit.b.source}, ${hit.b.slug}, now(), now(), now(), 'search', ${hit.why})
+                on conflict (company_id) do update set source = excluded.source, slug = excluded.slug, checked_at = now(), fetched_at = now(), searched_at = now(), found_via = 'search', note = excluded.note`;
+      out.push({ company: c.name, board: `${hit.b.source}/${hit.b.slug}`, roles: hit.b.jobs.length, why: hit.why });
     } else {
       none++;
-      if (c.source) await sql`update wgf.jobs set active = false where company_id = ${c.id} and active`;
-      await sql`insert into wgf.company_ats (company_id, source, slug, checked_at) values (${c.id}, null, null, now())
-                on conflict (company_id) do update set source = null, slug = null, checked_at = now()`;
+      await sql`insert into wgf.company_ats (company_id, source, slug, checked_at, searched_at, note) values (${c.id}, null, null, now(), now(), ${cands.length ? `rejected ${cands.map((k) => `${k.src}/${k.slug}`).join(", ")}` : "no board in search"})
+                on conflict (company_id) do update set checked_at = now(), searched_at = now(), note = excluded.note where wgf.company_ats.source is null`;
     }
-  }
-  const [left] = await sql`
-    with latest as (select distinct on (r.company_id) r.company_id from wgf.rounds r where r.status = 'live' and r.announced_on >= current_date - 365)
-    select count(*)::int as n from latest l left join wgf.company_ats a on a.company_id = l.company_id
-    where a.company_id is null or (a.source is null and a.checked_at < now() - interval '7 days') or (a.source is not null and coalesce(a.fetched_at, 'epoch') < now() - interval '20 hours')`;
-  return { processed: cos.length, boards_found: found, roles, no_board: none, remaining: left.n };
+  }));
+  return { searched: items.length, boards_found: found, roles, no_board: none, found: out };
+}
+
+// Daily refresh of known boards, plus boards linked from a company's careers page.
+async function run(body: Record<string, unknown>) {
+  const limit = Math.min(Math.max(Number(body.limit) || 20, 1), 40);
+  const due = () => sql`(a.source is not null and coalesce(a.fetched_at, 'epoch') < now() - interval '20 hours')
+      or (a.source is null and c.careers_url ~* '(greenhouse\.io|lever\.co|ashbyhq\.com|workable\.com|smartrecruiters\.com|recruitee\.com|personio\.(de|com))' and coalesce(a.checked_at, 'epoch') < now() - interval '7 days')`;
+  const cos = await sql`
+    with latest as (${LATEST()})
+    select c.id, coalesce(c.name_en, c.name) as name, c.domain, c.careers_url, l.round_id, l.stage, l.amount_usd, l.announced_on, a.source, a.slug
+    from latest l join wgf.companies c on c.id = l.company_id left join wgf.company_ats a on a.company_id = c.id
+    where ${due()} order by l.announced_on desc limit ${limit}`;
+  let refreshed = 0, roles = 0, failed = 0, added = 0;
+  await Promise.all(cos.map(async (c) => {
+    let src = c.source, slug = c.slug, fromCareers = false;
+    if (!src) { const a = atsFromUrl(c.careers_url); if (!a) return; [src, slug] = a; fromCareers = true; }
+    const b = await ATS[src](slug);
+    if (!b) {
+      failed++;   // feed unreachable today: keep the board and its roles, try again tomorrow
+      if (fromCareers) await sql`insert into wgf.company_ats (company_id, checked_at, note) values (${c.id}, now(), 'careers link feed unreachable') on conflict (company_id) do update set checked_at = now()`;
+      else await sql`update wgf.company_ats set fetched_at = now(), note = 'feed unreachable ' || current_date where company_id = ${c.id}`;
+      return;
+    }
+    roles += await storeBoard(c, b);
+    if (fromCareers) {
+      added++;
+      await sql`insert into wgf.company_ats (company_id, source, slug, checked_at, fetched_at, found_via) values (${c.id}, ${src}, ${slug}, now(), now(), 'careers_page')
+                on conflict (company_id) do update set source = excluded.source, slug = excluded.slug, checked_at = now(), fetched_at = now(), found_via = 'careers_page'`;
+    } else { refreshed++; await sql`update wgf.company_ats set fetched_at = now(), note = null where company_id = ${c.id}`; }
+  }));
+  const [left] = await sql`with latest as (${LATEST()}) select count(*)::int as n from latest l join wgf.companies c on c.id = l.company_id left join wgf.company_ats a on a.company_id = c.id where ${due()}`;
+  return { processed: cos.length, refreshed, added_from_careers_page: added, feed_unreachable: failed, roles, remaining: left.n };
 }
 
 Deno.serve(async (req) => {
@@ -206,8 +275,10 @@ Deno.serve(async (req) => {
   if (!cfg || req.headers.get("x-wgf-token") !== cfg.value) return json({ error: "unauthorised" }, 401);
   try {
     const body = await req.json().catch(() => ({}));
+    if (body.mode === "targets") return json(await targets(body));
+    if (body.mode === "boards") return json(await boards(body));
     if (body.mode === "run") return json(await run(body));
-    return json({ error: "mode must be run" }, 400);
+    return json({ error: "mode must be targets, boards or run" }, 400);
   } catch (e) {
     return json({ error: String((e as Error).message ?? e) }, 500);
   }
