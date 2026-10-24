@@ -156,6 +156,19 @@ export function regionTiles(rows) {
   <span class="track"><span style="width:${Math.max((g.v / total) * 100, 1).toFixed(1)}%"></span></span></a>`).join("")}</div>`;
 }
 
+// "Top markets by funding": the five regions in a fixed grid (Africa as a tall third column), beside the top countries.
+export function marketTiles(rows) {
+  const total = sum(rows.map((r) => r.amount_usd || 0)) || 1;
+  const groups = new Map(byRegion(rows).map((g) => [g.k, g]));
+  return `<div class="tiles mtiles">${["americas", "apac", "africa", "europe", "mideast"].map((k) => {
+    const c = contOf(k), g = groups.get(k) || { n: 0, v: 0 };
+    return `<a class="tile t-${k}" href="#startups"${g.n ? ` data-f="${k}"` : ""} style="--c:${c.color}">
+  <span class="rn">${esc(c.name)}</span><span class="rv">${g.n ? usd(g.v) || "Undisclosed" : "No rounds"}</span>
+  <span class="rc">${g.n ? `${plural(g.n, "round")}${g.v ? ` · ${Math.round((g.v / total) * 100) || "<1"}% of capital` : ""}` : "None reported"}</span>
+  <span class="track"><span style="width:${g.v ? Math.max((g.v / total) * 100, 1).toFixed(1) : 0}%"></span></span></a>`;
+  }).join("")}</div>`;
+}
+
 // Ranked horizontal bars: [{label, v, n, color, value?}] → one row each. value overrides the formatted amount.
 export function rankBars(items, { unit = "round", fmt = usd, max = null } = {}) {
   const m = max ?? Math.max(...items.map((i) => i.v), 1);

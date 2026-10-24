@@ -10,7 +10,7 @@ import crypto from "node:crypto";
 import { fileURLToPath } from "node:url";
 import { CONTINENTS, continentOf, countryLabel } from "./src/regions.mjs";
 import { editionModel, articleBody, editionCard, cleanFounders, cleanInvestors } from "./src/edition.mjs";
-import { startupList, regionTiles, rankBars, chartCard, stackBars, byRegion, roundsCsv, firstSource as firstSourceOf } from "./src/units.mjs";
+import { startupList, regionTiles, marketTiles, rankBars, chartCard, stackBars, byRegion, roundsCsv, firstSource as firstSourceOf } from "./src/units.mjs";
 // Daily editions start with the 18 October 2026 issue. Headline overrides: data/editions.json { "YYYY-MM-DD": { "headline": "...", "dek": "..." } }
 const EDITION_START = "2026-10-19";
 
@@ -194,8 +194,7 @@ function dayView(day, rows, { when, edition = false }) {
   <div class="acts">${edition ? `<a class="btn2 dark" href="/editions/${day}/">Read the full edition</a>` : ""}<a class="btn2" href="${csv}" download>${ICON_DL}Download the day as CSV</a></div>
   <div class="stats"><div><span class="sv">${usd(total) || "Undisclosed"}</span><span class="sl">raised</span></div><div><span class="sv">${rows.length}</span><span class="sl">${rows.length === 1 ? "startup" : "startups"}</span></div><div><span class="sv">${disclosed.length}/${rows.length}</span><span class="sl">disclosed an amount</span></div></div>
 </section>
-<section class="block"><h2>Where the money went</h2>${regionTiles(rows)}</section>
-<section class="block"><h2>Top countries</h2>${rankBars(topCountries(rows))}</section>
+<section class="block"><h2>Top markets by funding</h2><div class="markets">${rankBars(topCountries(rows, 6))}${marketTiles(rows)}</div></section>
 ${startupList(rows, { csv, day })}
 </div>`;
 }
