@@ -11,7 +11,7 @@ What Got Funded curates startup funding news and analyses it. Every round comes 
 | When | Step |
 |---|---|
 | 9pm | Apify crawler reads every mapped source for **yesterday in Sydney** (a run on the 10th collects the 9th, which has ended everywhere by then). |
-| 10pm | Claude extracts rounds from each article (translated to English), merges duplicates, finds company websites, reads company sites for socials and careers pages. |
+| 10pm | An LLM agent extracts rounds from each article (translated to English), merges duplicates, finds company websites, reads company sites for socials and careers pages. |
 | 5am | Site rebuild with the new daily article; Beehiiv newsletter draft created. |
 | 6–7am | Newsletter sent. |
 

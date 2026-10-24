@@ -114,7 +114,7 @@ The full data model is in [`docs/data-model.md`](docs/data-model.md), and the ex
 | n8n | Scheduling and wiring: feed polling, Apify triggers, newsletter parsing, hand-offs between steps |
 | Apify | Scraping pages that have no feed |
 | Supabase | Database: companies, rounds, investors, founders, sources and weekly history |
-| Claude Code | The collector, checker and publisher agents |
+| LLM agents | The collector, checker and publisher agents |
 | Crunchbase MCP | Internal coverage check and gap-filling |
 | Apollo, Clay | Company enrichment |
 | Vercel | Hosting and deployment of whatgotfunded.com |
