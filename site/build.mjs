@@ -194,7 +194,7 @@ function dayView(day, rows, { when, edition = false }) {
   <p class="kick">${edition ? "Daily edition · " : ""}${esc(longDate(day))}</p>
   <h1>Startups that raised funding ${esc(when)}.</h1>
   <p class="lede">Found across ${SOURCES_LINE}, and checked against the first public report of each round.</p>
-  <div class="acts">${edition ? `<a class="btn2 dark" href="/editions/${day}/">Read the full edition</a>` : ""}<a class="btn2" href="${csv}" download>${ICON_DL}Download the day as CSV</a></div>
+  ${edition ? `<div class="acts"><a class="btn2 dark" href="/editions/${day}/">Read the full edition</a></div>` : ""}
   <div class="stats"><div><span class="sv">${usd(total) || "Undisclosed"}</span><span class="sl">raised</span></div><div><span class="sv">${rows.length}</span><span class="sl">${rows.length === 1 ? "startup" : "startups"}</span></div><div><span class="sv">${disclosed.length}/${rows.length}</span><span class="sl">disclosed an amount</span></div></div>
 </section>
 <section class="block"><h2>Top markets by funding</h2><div class="markets">${rankBars(topCountries(rows, 6))}${marketTiles(rows)}</div></section>
