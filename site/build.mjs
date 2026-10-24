@@ -126,8 +126,8 @@ const subscribeForm = (cls = "bh") =>
   `<div class="${cls}"><script async src="https://subscribe-forms.beehiiv.com/v3/loader.js" data-beehiiv-form="${BEEHIIV_FORM}"></script></div>`;
 const BEEHIIV_SCRIPT = "";   // the v3 loader in each form needs no page-level script
 const joinBand = () => `<section class="join" aria-labelledby="join-h">
-  <div><h2 id="join-h">What got funded, in your inbox at 7am.</h2><p>Every round from the day before, the investors behind them, and where each one was reported. Free, every day.</p></div>
-  <div>${subscribeForm()}<small>Sydney time. One email a day, unsubscribe in one click.</small></div>
+  <div><h2 id="join-h">What got funded, in your inbox every morning.</h2><p>Every round from the day before, the investors behind them, and where each one was reported. Free, every day.</p></div>
+  <div>${subscribeForm()}<small>One email a day. Unsubscribe in one click.</small></div>
 </section>`;
 
 // ---------- shared pieces ----------
@@ -267,7 +267,7 @@ function companyPage(rs, all) {
       ${sim.length ? sim.map((x) => `<div class="sim"><a href="${x.href}">${esc(x.company)}</a><span class="num">${usd(x.amount_usd) || "–"}</span><small>${esc([STAGE[x.stage] !== "Not stated" ? STAGE[x.stage] : "", x.country, x.leads[0] && `led by ${x.leads[0]}`].filter(Boolean).join(", ") || shortDate(x.announced_on))}</small></div>`).join("")
         : `<p>No other ${esc(r.sector || "")} rounds within a week of this one.</p>`}
     </div>
-    <div class="panel"><h3>Get every round by email</h3><p>Free, every morning at 7am Sydney time.</p><a class="more" href="/subscribe/">Subscribe</a></div>
+    <div class="panel"><h3>Get every round by email</h3><p>Free, every morning.</p><a class="more" href="/subscribe/">Subscribe</a></div>
   </aside>
 </div>`;
   const amountText = r.amount_usd ? ` raised ${usd(r.amount_usd)}` : " raised funding";
@@ -587,7 +587,7 @@ ${cards}
 function subscribePage() {
   const body = `<section class="intro"><h1>Every startup funding round, in your inbox at 7am.</h1>
 <p class="lede">Each morning: every round announced the day before, the total raised by continent and market, the investors behind them, and where each one was reported. Free.</p></section>
-<section class="join" style="margin-top:40px"><div><h2>Subscribe free</h2><p>One email a day, Sydney time. Unsubscribe in one click.</p></div><div>${subscribeForm()}</div></section>`;
+<section class="join" style="margin-top:40px"><div><h2>Subscribe free</h2><p>One email a day. Unsubscribe in one click.</p></div><div>${subscribeForm()}</div></section>`;
   return shell({ title: "Subscribe | What Got Funded", desc: "Get every startup funding round by email at 7am, free.", body, canonical: "/subscribe/", scripts: BEEHIIV_SCRIPT });
 }
 
