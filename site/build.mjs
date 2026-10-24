@@ -546,7 +546,7 @@ ${l.map((s) => `<tr><td><a class="u" href="${esc(s.homepage)}" rel="nofollow noo
     }).join("\n");
 
   const steps = [
-    ["Scraper", "Collects the day's funding news from every source and local-language search, for the previous day in Sydney time.", "Apify", "#f9a825"],
+    ["Scraper", "Collects the day's funding news from every source and local-language search, for the previous day.", "Apify", "#f9a825"],
     ["Structurer", "Reads each story in its own language and records the company, amount, stage, investors and founders in English.", "Claude Haiku", "#3d5afe"],
     ["Verifier", "Finds the first public report of each round and opens the page to confirm its real publish date.", "Gemini + Google Search, Claude Sonnet", "#00897b"],
     ["Curator", "Merges duplicates, removes old rounds and non-equity deals, and picks the stories that lead the day.", "Claude Sonnet", "#e53935"],
@@ -554,9 +554,9 @@ ${l.map((s) => `<tr><td><a class="u" href="${esc(s.homepage)}" rel="nofollow noo
     ["Newsletter publisher", "Prepares the morning email with the day's top 20 startups and a link to the full edition.", "Beehiiv", "#172033"],
   ];
   const pipe = `<div class="pipe" role="img" aria-label="The daily pipeline: six agents from scraping to newsletter">
-  <div class="orch"><span class="pill">n8n</span><span>One workflow runs the six agents every night at <b>9pm Sydney time</b>. Every round, source and check is stored in <b>Supabase</b>.</span></div>
+  <div class="orch"><span class="pill">n8n</span><span>One workflow runs the six agents <b>every day</b>. Every round, source and check is stored in <b>Supabase</b>.</span></div>
   <ol>${steps.map(([h, p, t, c], i) => `<li style="--c:${c}"><span class="n">STEP ${i + 1}</span><h3>${h}</h3><p>${p}</p><span class="tool">${t}</span></li>`).join("")}</ol>
-  <div class="out"><b style="color:var(--ink)">What comes out:</b><span>Daily edition on the site</span><span>Newsletter at 7am</span><span>CSV of every round</span><span>Analysis</span></div>
+  <div class="out"><b style="color:var(--ink)">What comes out:</b><span>Daily edition on the site</span><span>Daily newsletter</span><span>CSV of every round</span><span>Analysis</span></div>
 </div>`;
   const block = (k, c, h, inner, wide = false) => `<section class="pblock${wide ? " wide" : ""}" style="--c:${c}"><span class="pk"><i></i>${k}</span><h3>${h}</h3>${inner}</section>`;
   const body = `<div class="wrap about2">
@@ -585,10 +585,10 @@ ${cards}
 }
 
 function subscribePage() {
-  const body = `<section class="intro"><h1>Every startup funding round, in your inbox at 7am.</h1>
+  const body = `<section class="intro"><h1>Every startup funding round, in your inbox every day.</h1>
 <p class="lede">Each morning: every round announced the day before, the total raised by continent and market, the investors behind them, and where each one was reported. Free.</p></section>
 <section class="join" style="margin-top:40px"><div><h2>Subscribe free</h2><p>One email a day. Unsubscribe in one click.</p></div><div>${subscribeForm()}</div></section>`;
-  return shell({ title: "Subscribe | What Got Funded", desc: "Get every startup funding round by email at 7am, free.", body, canonical: "/subscribe/", scripts: BEEHIIV_SCRIPT });
+  return shell({ title: "Subscribe | What Got Funded", desc: "Get every startup funding round by email every day, free.", body, canonical: "/subscribe/", scripts: BEEHIIV_SCRIPT });
 }
 
 function notFoundPage() {
