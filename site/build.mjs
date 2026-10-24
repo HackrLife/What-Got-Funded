@@ -121,9 +121,10 @@ ${body}
 </body></html>`;
 }
 
+// Beehiiv v3 embed (published form of the What Got Funded publication): the loader draws the form where the script sits.
 const subscribeForm = (cls = "bh") =>
-  `<iframe src="https://subscribe-forms.beehiiv.com/${BEEHIIV_FORM}" class="${cls}" data-test-id="beehiiv-embed" frameborder="0" scrolling="no" title="Subscribe to What Got Funded by email"></iframe>`;
-const BEEHIIV_SCRIPT = `\n<script async src="https://subscribe-forms.beehiiv.com/embed.js"></script>`;
+  `<div class="${cls}"><script async src="https://subscribe-forms.beehiiv.com/v3/loader.js" data-beehiiv-form="${BEEHIIV_FORM}"></script></div>`;
+const BEEHIIV_SCRIPT = "";   // the v3 loader in each form needs no page-level script
 const joinBand = () => `<section class="join" aria-labelledby="join-h">
   <div><h2 id="join-h">What got funded, in your inbox at 7am.</h2><p>Every round from the day before, the investors behind them, and where each one was reported. Free, every day.</p></div>
   <div>${subscribeForm()}<small>Sydney time. One email a day, unsubscribe in one click.</small></div>
