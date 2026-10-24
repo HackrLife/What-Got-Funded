@@ -193,7 +193,38 @@
     requestAnimationFrame(function () { wrap.classList.add("on"); panel.focus(); });
     body.scrollTop = 0;
     document.dispatchEvent(new CustomEvent("wgf:panel", { detail: { id: card.id, body: body } }));
+    subscribeCard(card);
     if (push && history.pushState) history.pushState({ panel: card.id }, "", "#" + card.id);
+  }
+  // A subtle subscribe card pinned under the details: from the second panel a visitor opens, hidden for 7 days after ✕,
+  // and never again once they say they are subscribed. It names the company they are reading about.
+  var store = {
+    get: function (k) { try { return localStorage.getItem(k); } catch (e) { return null; } },
+    set: function (k, v) { try { localStorage.setItem(k, v); } catch (e) { /* private mode */ } },
+  };
+  var opens = 0;
+  try { opens = Number(sessionStorage.getItem("wgf-opens")) || 0; } catch (e) { /* ignore */ }
+  var formMeta = document.querySelector('meta[name="wgf-subscribe-form"]');
+  function subscribeCard(card) {
+    var old = panel.querySelector(".psub"); if (old) old.remove();
+    opens++; try { sessionStorage.setItem("wgf-opens", String(opens)); } catch (e) { /* ignore */ }
+    if (!formMeta || opens < 2 || store.get("wgf-subscribed")) return;
+    var hidUntil = Number(store.get("wgf-sub-hide")) || 0; if (Date.now() < hidUntil) return;
+    var nameEl = card.querySelector(".c-name"); var name = nameEl ? nameEl.textContent.trim() : "";
+    var jobs = card.classList.contains("jcard") || card.classList.contains("scard");
+    var box = document.createElement("div"); box.className = "psub";
+    var p = document.createElement("p");
+    if (jobs) p.innerHTML = "Get the top founding and leadership roles at newly funded startups in your inbox every day. <b>Free.</b>";
+    else { p.appendChild(document.createTextNode("Get startups like ")); var b = document.createElement("b"); b.textContent = name || "this one"; p.appendChild(b); p.appendChild(document.createTextNode(" in your inbox every day. Free.")); }
+    var x = document.createElement("button"); x.type = "button"; x.className = "psub-x"; x.setAttribute("aria-label", "Hide for a week"); x.innerHTML = "&times;";
+    x.addEventListener("click", function () { store.set("wgf-sub-hide", String(Date.now() + 7 * 864e5)); box.remove(); });
+    var form = document.createElement("div"); form.className = "psub-form";
+    var sc = document.createElement("script"); sc.async = true; sc.src = "https://subscribe-forms.beehiiv.com/v3/loader.js";
+    sc.setAttribute("data-beehiiv-form", formMeta.getAttribute("content")); form.appendChild(sc);
+    var done = document.createElement("button"); done.type = "button"; done.className = "psub-done"; done.textContent = "I'm already subscribed";
+    done.addEventListener("click", function () { store.set("wgf-subscribed", "1"); box.remove(); });
+    box.appendChild(x); box.appendChild(p); box.appendChild(form); box.appendChild(done);
+    panel.appendChild(box);
   }
   function close(pop) {
     if (wrap.hidden) return;
