@@ -575,10 +575,14 @@ ${l.map((s) => `<tr><td><a class="u" href="${esc(s.homepage)}" rel="nofollow noo
   const who = [
     ["Account executives", "Reach a startup in the weeks after it raises, while the budget for new tools and services is being set."],
     ["Sales development reps", "Start each day with a short, fresh list of funded companies, their founders and LinkedIn profiles, and a note ready to send."],
-    ["Inbound and marketing teams", "Spot newly funded companies already in your pipeline, and target ads and content at the sectors and markets raising money now."],
+    ["Inbound teams", "Spot newly funded companies already in your pipeline and move them to the top of the queue."],
+    ["Marketers", "Aim ads, content and events at the sectors and markets raising money right now."],
     ["Agency owners", "Offer design, growth, recruiting or engineering help to startups that just raised and are about to spend on exactly that."],
     ["Solopreneurs and freelancers", "Find the founders who now have budget for fractional help, and contact them before larger firms do."],
     ["ISVs and software vendors", "Find funded startups in your target sectors and reach them while they are still choosing the tools they will build on."],
+    ["Investors", "Track who is backing what, find co-investors, and see which sectors and markets are heating up."],
+    ["Researchers and analysts", "Study where capital flows by region, sector and stage, with every round linked to its source and free to download."],
+    ["Startup founders", "See which investors are writing cheques in your space, and compare your round with your peers'."],
   ];
   const deliver = [
     ["Daily email", "Every startup that raised yesterday, a short analysis, and the top jobs at those startups. Free, every day.", "/subscribe/", "Subscribe"],
