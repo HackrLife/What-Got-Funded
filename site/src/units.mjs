@@ -110,7 +110,8 @@ export function startupCard(r, opts = {}) {
   const more = (list, n) => list.length > n ? ` +${list.length - n}` : "";
   const coLinks = [icon("web", r.domain && `https://${r.domain}`, "Website"), icon("li", r.linkedin_url, "Company LinkedIn"), icon("x", r.x_url, "Company X")].join("");
   const full = startupUnit(r, { ...opts, heading: "h2" }).replace(` id="r-${r.id}"`, "");
-  return `<article class="card" id="r-${r.id}" data-c="${r.cont}" data-panel style="--c:${c.color}">
+  return `<article class="card" id="r-${r.id}" data-c="${r.cont}" data-panel tabindex="0" style="--c:${c.color}">
+  <button type="button" class="pick" aria-pressed="false" aria-label="Select ${esc(r.company)} for export"></button>
   <div class="c-top"><span class="c-where"><i class="dot"></i>${esc(r.country || "Not stated")}</span><span>${esc(dayMonth(day))}</span></div>
   <h3 class="c-name">${href ? `<a href="${href}">${esc(r.company)}</a>` : esc(r.company)}</h3>
   <div class="c-money"><b${amount ? "" : ' class="na"'}>${esc(amount || "Undisclosed")}</b><span>${esc(STAGE[r.stage] || "Stage not stated")}</span></div>
@@ -132,13 +133,19 @@ export function startupList(rows, { title = "Every startup", csv = null, day = n
   const chips = [`<button type="button" class="on" data-f="all">All ${rows.length}</button>`, ...regs.map((c) => `<button type="button" data-f="${c.k}" style="--c:${c.color}"><i class="dot"></i>${esc(regionName(c.k))} ${c.n}</button>`)].join("");
   return `<section class="block list" id="startups">
   <div class="h2row"><h2>${esc(title)}</h2>${csv ? `<a class="csv" href="${csv}" download>${ICON_DL}Download CSV</a>` : ""}</div>
-  <div class="chips" role="toolbar" aria-label="Filter by region">${chips}</div>
+  <div data-finder="bar"><div class="chips" role="toolbar" aria-label="Filter by region">${chips}</div></div>
   <div class="cards" data-page="12">
 ${sorted.map((r) => startupCard(r, { day: day || r.announced_on })).join("\n")}
   </div>
   <div class="more-wrap"><button type="button" class="more-btn" hidden>Show more startups</button></div>
 </section>`;
 }
+// The fields the browser needs to filter, draw a card and its panel, and build the CSVs (finder.mjs).
+export function browserRow(r) {
+  const { summary, headline, ...rest } = r;
+  return { ...rest, sources: (r.sources || []).slice(0, 6).map((x) => ({ url: x.url, source: x.source, published_at: x.published_at })) };
+}
+export const jsonScript = (id, obj) => `<script type="application/json" id="${id}">${JSON.stringify(obj).replace(/</g, "\\u003c")}</script>`;
 const ICON_DL = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v11m0 0l-4.5-4.5M12 14l4.5-4.5M4 17v3h16v-3" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
 
 export function byRegion(rows) {

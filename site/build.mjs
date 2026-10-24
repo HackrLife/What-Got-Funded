@@ -10,7 +10,7 @@ import crypto from "node:crypto";
 import { fileURLToPath } from "node:url";
 import { CONTINENTS, continentOf, countryLabel } from "./src/regions.mjs";
 import { editionModel, articleBody, editionCard, cleanFounders, cleanInvestors } from "./src/edition.mjs";
-import { startupList, regionTiles, marketTiles, rankBars, chartCard, stackBars, byRegion, roundsCsv, firstSource as firstSourceOf } from "./src/units.mjs";
+import { startupList, browserRow, jsonScript, regionTiles, marketTiles, rankBars, chartCard, stackBars, byRegion, roundsCsv, firstSource as firstSourceOf } from "./src/units.mjs";
 // Daily editions start with the 18 October 2026 issue. Headline overrides: data/editions.json { "YYYY-MM-DD": { "headline": "...", "dek": "..." } }
 const EDITION_START = "2026-10-19";
 
@@ -87,9 +87,11 @@ function amountCell(r) {
 }
 
 // ---------- page shell ----------
-let CSS_HREF = "/assets/styles.css", JS_SRC = "/assets/app.js";
+let CSS_HREF = "/assets/styles.css", JS_SRC = "/assets/app.js", JS_DIR = "/assets/js";
+let HIRING = [];   // company ids with key roles open or a hiring signal (Jobs), for the "Hiring now" filter
+const FINDER = () => `\n<script type="module" src="${JS_DIR}/finder.mjs"></script>`;
 function shell({ title, desc, active = "", body, canonical, scripts = "" }) {
-  const nav = [["/", "Today"], ["/editions/", "Editions"], ["/analysis/", "Analysis"], ["/investors/", "Investors"], ["/jobs/", "Jobs"], ["/about/", "About"]]
+  const nav = [["/", "Today"], ["/explore/", "Explore"], ["/editions/", "Editions"], ["/analysis/", "Analysis"], ["/investors/", "Investors"], ["/jobs/", "Jobs"], ["/about/", "About"]]
     .map(([h, t]) => `<a href="${h}"${active === t ? ' class="on" aria-current="page"' : ""}>${t}</a>`).join("");
   return `<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
@@ -196,20 +198,21 @@ function dayView(day, rows, { when, edition = false }) {
 </section>
 <section class="block"><h2>Top markets by funding</h2><div class="markets">${rankBars(topCountries(rows, 6))}${marketTiles(rows)}</div></section>
 ${startupList(rows, { csv, day })}
+${jsonScript("wgf-rows", { rows: rows.map(browserRow), hiring: HIRING })}
 </div>`;
 }
 
 function homePage(day, rows, prev, next, isYesterday, hasEdition = false) {
   const total = sum(rows.map((r) => r.amount_usd || 0));
   const body = dayView(day, rows, { when: `on ${weekday(day)} ${dayMonth(day)}`, edition: hasEdition }) + joinBand();
-  return shell({ title: `What Got Funded: ${plural(rows.length, "startup")} raised ${usd(total) || ""} on ${dayMonth(day)}`, desc: `Every startup funding round announced on ${longDate(day)}, across all markets, with founders, investors and sources.`, active: "Today", body, canonical: "/", scripts: BEEHIIV_SCRIPT });
+  return shell({ title: `What Got Funded: ${plural(rows.length, "startup")} raised ${usd(total) || ""} on ${dayMonth(day)}`, desc: `Every startup funding round announced on ${longDate(day)}, across all markets, with founders, investors and sources.`, active: "Today", body, canonical: "/", scripts: BEEHIIV_SCRIPT + FINDER() });
 }
 
 function dayPage(day, rows, prev, next, hasEdition = false) {
   const total = sum(rows.map((r) => r.amount_usd || 0));
   const nav = `<div class="wrap"><nav class="daynav2">${prev ? `<a href="/day/${prev}/">Previous day</a>` : "<span></span>"}${next ? `<a href="/day/${next}/">Next day</a>` : "<span></span>"}</nav></div>`;
   const body = dayView(day, rows, { when: `on ${weekday(day)} ${dayMonth(day)}`, edition: hasEdition }) + nav + joinBand();
-  return shell({ title: `${longDate(day)}: ${plural(rows.length, "round")}, ${usd(total) || ""} | What Got Funded`, desc: `Every startup funding round announced on ${longDate(day)}, with founders, investors and sources.`, active: "Today", body, canonical: `/day/${day}/`, scripts: BEEHIIV_SCRIPT });
+  return shell({ title: `${longDate(day)}: ${plural(rows.length, "round")}, ${usd(total) || ""} | What Got Funded`, desc: `Every startup funding round announced on ${longDate(day)}, with founders, investors and sources.`, active: "Today", body, canonical: `/day/${day}/`, scripts: BEEHIIV_SCRIPT + FINDER() });
 }
 
 function companyPage(rs, all) {
@@ -466,6 +469,20 @@ ${sigBlock}
   return shell({ title: "Founding and leadership roles at newly funded startups | What Got Funded", desc: "Founding, leadership, remote and fractional roles at startups that just raised, and the startups that raised to hire.", active: "Jobs", body, canonical: "/jobs/", scripts: BEEHIIV_SCRIPT });
 }
 
+// Explore: every published round, filtered in the browser (finder.mjs) from /data/explore.json
+function explorePage(n, ver) {
+  const body = `<div class="xwrap" data-finder="panel" data-src="/data/explore.json?v=${ver}">
+  <div class="xhead"><div><h1>Explore</h1><p>Every round since launch: ${n.toLocaleString("en-US")} startups. Filter by country, city, stage, sector and investor, tick the ones you want, and export them.</p></div>
+    <button type="button" class="btn2 xfbtn">Filters</button></div>
+  <aside class="fpanel" aria-label="Filters"></aside>
+  <section class="xres"><div class="xtop"><b class="xcount">Loading rounds…</b><div class="xtools"></div></div>
+    <div class="fact"></div><div class="cards" id="xcards"></div>
+    <div class="more-wrap"><button type="button" class="more-btn" hidden>Show more</button></div>
+    <noscript><p>Explore needs JavaScript. <a href="/data/all-rounds.csv">Download every round as a CSV</a> instead.</p></noscript></section>
+</div>${joinBand()}`;
+  return shell({ title: "Explore every startup funding round | What Got Funded", desc: "Search and filter every startup funding round by country, city, stage, sector and investor, then export the startups you pick as a CSV or for your CRM. Free.", active: "Explore", body, canonical: "/explore/", scripts: BEEHIIV_SCRIPT + FINDER() });
+}
+
 function methodologyPage() {
   const body = `<div class="narrow prose">
 <h1>Methodology</h1>
@@ -626,6 +643,11 @@ async function main() {
   const h = (s) => crypto.createHash("sha1").update(s).digest("hex").slice(0, 10);
   CSS_HREF = `/assets/styles.${h(css)}.css`; JS_SRC = `/assets/app.${h(js)}.js`;
   write(CSS_HREF, css); write(JS_SRC, js);
+  // browser modules (finder.mjs reuses the card and CSV code), in a content-hashed folder
+  const mods = ["finder.mjs", "units.mjs", "edition.mjs", "regions.mjs"].map((f) => [f, fs.readFileSync(path.join(ROOT, "src", f), "utf8")]);
+  JS_DIR = `/assets/js-${h(mods.map((m) => m[1]).join(""))}`;
+  for (const [f, src] of mods) write(`${JS_DIR}/${f}`, src);
+  HIRING = [...new Set([...(data.jobs || []).filter((j) => j.key_role).map((j) => j.company_id), ...(data.hiring || []).map((x) => x.company_id)])];
   fs.cpSync(path.join(ROOT, "public"), OUT, { recursive: true });
 
   // home: yesterday if it has rounds, else the latest published day
@@ -645,6 +667,9 @@ async function main() {
   // free CSV downloads: one per day and one for everything published
   for (const d of days) write(`data/${d}.csv`, roundsCsv(byDay.get(d), SITE_URL));
   write("data/all-rounds.csv", roundsCsv(published, SITE_URL));
+  const explore = JSON.stringify({ rows: published.map(browserRow), hiring: HIRING });
+  write("data/explore.json", explore);
+  write("explore/index.html", explorePage(published.length, h(explore)));
 
   const byCo = new Map();
   for (const r of published) { if (!byCo.has(r.company_id)) byCo.set(r.company_id, []); byCo.get(r.company_id).push(r); }

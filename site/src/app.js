@@ -140,43 +140,6 @@
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", ready); else ready();
 })();
 
-// ---------- startup lists: region chips and progressive loading (12 at a time, more on scroll) ----------
-(function () {
-  "use strict";
-  document.querySelectorAll(".list").forEach(function (list) {
-    var box = list.querySelector(".cards"); if (!box) return;
-    var units = Array.prototype.slice.call(box.querySelectorAll(".card"));
-    var page = Number(box.getAttribute("data-page")) || 12, shown = page, filter = "all";
-    var btn = list.querySelector(".more-btn"), chips = Array.prototype.slice.call(list.querySelectorAll(".chips button"));
-    function match(u) { return filter === "all" || u.getAttribute("data-c") === filter; }
-    function render() {
-      var n = 0, total = 0;
-      units.forEach(function (u) {
-        var ok = match(u); if (ok) total++;
-        if (ok && n < shown) { u.removeAttribute("data-hide"); n++; } else u.setAttribute("data-hide", "");
-      });
-      if (btn) { btn.hidden = n >= total; btn.textContent = "Show more startups (" + (total - n) + " more)"; }
-    }
-    function more() { shown += page; render(); }
-    if (btn) btn.addEventListener("click", more);
-    if ("IntersectionObserver" in window && btn) {
-      new IntersectionObserver(function (es) { es.forEach(function (e) { if (e.isIntersecting && !btn.hidden) more(); }); }, { rootMargin: "600px 0px" }).observe(btn);
-    }
-    function setFilter(f) {
-      filter = f; shown = page;
-      chips.forEach(function (c) { c.classList.toggle("on", c.getAttribute("data-f") === f); });
-      render();
-    }
-    chips.forEach(function (c) { c.addEventListener("click", function () { setFilter(c.getAttribute("data-f")); }); });
-    document.querySelectorAll(".tile[data-f]").forEach(function (t) {
-      t.addEventListener("click", function () { setFilter(t.getAttribute("data-f")); });
-    });
-    // a link to a specific startup (#r-123) reveals everything so the anchor exists
-    if (location.hash && /^#r-\d+$/.test(location.hash)) { shown = units.length; }
-    render();
-  });
-})();
-
 // ---------- jobs board: tabs, function chips, founding/remote/fractional toggles ----------
 (function () {
   "use strict";
@@ -211,7 +174,7 @@
 // ---------- detail panel: clicking a card slides in its full details from the left ----------
 (function () {
   "use strict";
-  var cards = document.querySelectorAll("[data-panel]"); if (!cards.length) return;
+  if (!document.querySelector("[data-panel], [data-finder]")) return;
   var wrap = document.createElement("div");
   wrap.className = "pwrap"; wrap.hidden = true;
   wrap.innerHTML = '<div class="pshade"></div><aside class="panel" role="dialog" aria-modal="true" aria-label="Details" tabindex="-1">' +
@@ -229,6 +192,7 @@
     wrap.hidden = false; document.documentElement.classList.add("pnl-open");
     requestAnimationFrame(function () { wrap.classList.add("on"); panel.focus(); });
     body.scrollTop = 0;
+    document.dispatchEvent(new CustomEvent("wgf:panel", { detail: { id: card.id, body: body } }));
     if (push && history.pushState) history.pushState({ panel: card.id }, "", "#" + card.id);
   }
   function close(pop) {
@@ -239,15 +203,20 @@
     if (last) last.focus({ preventScroll: true });
     openId = null;
   }
-  [].forEach.call(cards, function (card) {
-    card.setAttribute("tabindex", "0");
-    card.addEventListener("click", function (e) {
-      var a = e.target.closest("a");
-      if (a && (a.target === "_blank" || e.metaKey || e.ctrlKey || e.shiftKey)) return;   // outside links and new-tab clicks behave normally
-      e.preventDefault(); open(card, true);
-    });
-    card.addEventListener("keydown", function (e) { if ((e.key === "Enter" || e.key === " ") && e.target === card) { e.preventDefault(); open(card, true); } });
+  // delegated, so cards drawn later (Explore) work too
+  document.addEventListener("click", function (e) {
+    var card = e.target.closest("[data-panel]"); if (!card || wrap.contains(card)) return;
+    if (e.target.closest(".pick")) return;   // the select box, handled by finder.mjs
+    var a = e.target.closest("a");
+    if (a && (a.target === "_blank" || e.metaKey || e.ctrlKey || e.shiftKey)) return;   // outside links and new-tab clicks behave normally
+    e.preventDefault(); open(card, true);
   });
+  document.addEventListener("keydown", function (e) {
+    var card = e.target.closest && e.target.closest("[data-panel]");
+    if (card && e.target === card && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); open(card, true); }
+  });
+  [].forEach.call(document.querySelectorAll("[data-panel]:not([tabindex])"), function (c) { c.setAttribute("tabindex", "0"); });
+  window.WGF_openPanel = function (card) { open(card, false); };
   wrap.querySelector(".pshade").addEventListener("click", function () { close(false); });
   wrap.querySelector(".pclose").addEventListener("click", function () { close(false); });
   document.addEventListener("keydown", function (e) { if (e.key === "Escape") close(false); });
