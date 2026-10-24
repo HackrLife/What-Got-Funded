@@ -189,7 +189,7 @@ function dayView(day, rows, { when, edition = false }) {
   return `<div class="wrap">
 <section class="hero2">
   <p class="kick">${edition ? "Daily edition · " : ""}${esc(longDate(day))}</p>
-  <h1>Every startup that raised money ${esc(when)}, in one place.</h1>
+  <h1>Startups that raised funding ${esc(when)}.</h1>
   <p class="lede">Found across ${SOURCES_LINE}, and checked against the first public report of each round.</p>
   <div class="acts">${edition ? `<a class="btn2 dark" href="/editions/${day}/">Read the full edition</a>` : ""}<a class="btn2" href="${csv}" download>${ICON_DL}Download the day as CSV</a></div>
   <div class="stats"><div><span class="sv">${usd(total) || "Undisclosed"}</span><span class="sl">raised</span></div><div><span class="sv">${rows.length}</span><span class="sl">${rows.length === 1 ? "startup" : "startups"}</span></div><div><span class="sv">${disclosed.length}/${rows.length}</span><span class="sl">disclosed an amount</span></div></div>
@@ -201,7 +201,7 @@ ${startupList(rows, { csv, day })}
 
 function homePage(day, rows, prev, next, isYesterday, hasEdition = false) {
   const total = sum(rows.map((r) => r.amount_usd || 0));
-  const body = dayView(day, rows, { when: isYesterday ? "yesterday" : `on ${weekday(day)} ${dayMonth(day)}`, edition: hasEdition }) + joinBand();
+  const body = dayView(day, rows, { when: `on ${weekday(day)} ${dayMonth(day)}`, edition: hasEdition }) + joinBand();
   return shell({ title: `What Got Funded: ${plural(rows.length, "startup")} raised ${usd(total) || ""} on ${dayMonth(day)}`, desc: `Every startup funding round announced on ${longDate(day)}, across all markets, with founders, investors and sources.`, active: "Today", body, canonical: "/", scripts: BEEHIIV_SCRIPT });
 }
 
