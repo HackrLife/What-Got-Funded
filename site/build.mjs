@@ -18,7 +18,7 @@ const ROOT = path.dirname(fileURLToPath(import.meta.url));
 const OUT = path.join(ROOT, "dist");
 const SITE_URL = (process.env.SITE_URL || "https://whatgotfunded.com").replace(/\/$/, "");
 const PUBLISH_URL = process.env.WGF_PUBLISH_URL || "https://cxtcwslqzrzjaulqcvvu.supabase.co/functions/v1/wgf-publish?days=150";
-const BEEHIIV_FORM = process.env.BEEHIIV_FORM_ID || "25f5c9ba-9712-405b-8319-832a0415e181";
+const BEEHIIV_FORM = process.env.BEEHIIV_FORM_ID || "265851f9-9a60-4063-98d0-aae396fcfdf9";   // What Got Funded publication (pub_1b7df605…)
 let SOURCES_LINE = "more than 300 news sources and local-language news searches";   // set from the source registry in main()
 
 // ---------- data ----------
