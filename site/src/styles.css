@@ -601,3 +601,10 @@ aside .panel p { font-size: 15px; color: var(--muted); }
   .hco h3 { font-size: 21px; }
   .tabs button { font-size: 16px; margin-right: 10px; }
 }
+/* jobs: hiring signal cards and feed credit */
+.sigs { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; }
+.hsig { padding-bottom: 20px; }
+.sigacts { display: flex; flex-wrap: wrap; gap: 10px 18px; margin-top: 14px; font-size: 14.5px; font-weight: 600; }
+.sigacts a { color: var(--ink, #12203a); text-decoration: underline; text-underline-offset: 3px; }
+.rmeta .via { color: var(--muted); font-style: italic; }
+@media (max-width: 760px) { .sigs { grid-template-columns: minmax(0, 1fr); } }

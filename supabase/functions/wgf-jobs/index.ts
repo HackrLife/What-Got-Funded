@@ -7,6 +7,12 @@
 //   { "mode": "boards", "items": [{ "company_id": 1, "organic": [{ "link", "title", "snippet" }] }] }
 //     → reads the board links in each company's search results, opens the board's public feed and keeps it only when
 //       the board belongs to the company. Stores the board and its open roles.
+//   { "mode": "feed_targets" }
+//     → company domains for the Fantastic.jobs feed: { backfill: [...never sent], daily: [...sent before] }. Companies whose own
+//       board we already read are left out (their roles are free from the board).
+//   { "mode": "ingest", "source": "fantastic" | "wwr", "items": [...], "mark_domains"?: [...] }
+//     → stores feed roles at funded companies. Fantastic.jobs rows match by company domain; We Work Remotely rows by exact
+//       company name. Feed roles close on their valid-through date, or 45 days after posting.
 //   { "mode": "run", "limit"?: 20 }
 //     → refreshes the open roles of every known board once a day (plus boards linked from a company's careers page).
 //
@@ -142,7 +148,9 @@ const isRemote = (j: Job) => j.remote === true || /remote|anywhere|distributed|w
 const isFractional = (j: Job) => /part[- ]?time|contract|freelance|temporary|interim|fractional|consult/i.test(`${j.employment_type ?? ""} ${j.title}`) || /\b(fractional|interim|advisor)\b/i.test(j.title);
 const JUNIOR = /\b(intern|internship|junior|graduate|trainee|apprentice|working student|werkstudent|praktikum|student)\b/i;
 
-async function storeBoard(c: Record<string, any>, b: Board) {
+type StoreOpts = { close?: boolean; solo?: boolean; via?: string | null; expires?: (j: Job) => string | null };
+async function storeBoard(c: Record<string, any>, b: Board, o: StoreOpts = {}) {
+  const close = o.close !== false, solo = o.solo !== false;
   const jobs = b.jobs.filter((j) => j.title && j.url && !JUNIOR.test(j.title));
   const perFunc = new Map<string, number>();
   for (const j of jobs) { const f = funcOf(j.title); perFunc.set(f, (perFunc.get(f) ?? 0) + 1); }
@@ -150,23 +158,24 @@ async function storeBoard(c: Record<string, any>, b: Board) {
   for (const j of jobs) {
     const fn = funcOf(j.title), sen = seniorityOf(j.title);
     const early = EARLY.has(String(c.stage));
-    const founding = /\bfounding\b|\bfirst\b|#1\b/i.test(j.title) || (early && (perFunc.get(fn) === 1 && fn !== "other" || RANK[sen] >= 3));
+    const founding = /\bfounding\b|\bfirst\b|#1\b/i.test(j.title) || (early && ((solo && perFunc.get(fn) === 1 && fn !== "other") || RANK[sen] >= 3));
     const remote = isRemote(j), fractional = isFractional(j);
     const key = founding || RANK[sen] >= 3 || (fractional && fn !== "other") || (remote && RANK[sen] >= 2);
     const posted = j.posted_on ?? null;
     const fresh = posted ? Math.max(0, 30 - (Date.now() - Date.parse(posted)) / 864e5) / 30 : 0.3;
     const score = (founding ? 3 : 0) + RANK[sen] + (remote ? 0.5 : 0) + (fractional ? 0.5 : 0) + fresh * 2 + Math.log10(Math.max(Number(c.amount_usd) || 1e6, 1e6)) - 6;
-    const [row] = await sql`insert into wgf.jobs (company_id, round_id, source, external_id, title, team, function, seniority, founding, remote, fractional, employment_type, location, posted_on, url, key_role, score, active, last_seen_at)
+    const [row] = await sql`insert into wgf.jobs (company_id, round_id, source, external_id, title, team, function, seniority, founding, remote, fractional, employment_type, location, posted_on, url, key_role, score, active, last_seen_at, expires_on, via)
       values (${c.id}, ${c.round_id}, ${b.source}, ${j.external_id}, ${j.title.slice(0, 200)}, ${j.team ?? null}, ${fn}, ${sen}, ${founding}, ${remote}, ${fractional}, ${j.employment_type ?? null},
-              ${j.location ? String(j.location).slice(0, 200) : null}, ${posted}, ${j.url}, ${key}, ${+score.toFixed(3)}, true, now())
+              ${j.location ? String(j.location).slice(0, 200) : null}, ${posted}, ${j.url}, ${key}, ${+score.toFixed(3)}, true, now(), ${o.expires ? o.expires(j) : null}, ${o.via ?? null})
       on conflict (source, external_id) do update set title = excluded.title, team = excluded.team, function = excluded.function, seniority = excluded.seniority, founding = excluded.founding,
         remote = excluded.remote, fractional = excluded.fractional, employment_type = excluded.employment_type, location = excluded.location, posted_on = coalesce(wgf.jobs.posted_on, excluded.posted_on),
-        url = excluded.url, key_role = excluded.key_role, score = excluded.score, active = true, last_seen_at = now(), round_id = excluded.round_id
+        url = excluded.url, key_role = excluded.key_role, score = excluded.score, active = true, last_seen_at = now(), round_id = excluded.round_id,
+        expires_on = excluded.expires_on, via = excluded.via
       returning id`;
     seen.push(Number(row.id));
   }
-  // roles no longer on the board are closed
-  await sql`update wgf.jobs set active = false where company_id = ${c.id} and source = ${b.source} and active and not (id = any(${seen}))`;
+  // roles no longer on the board are closed (feeds close by date instead)
+  if (close) await sql`update wgf.jobs set active = false where company_id = ${c.id} and source = ${b.source} and active and not (id = any(${seen}))`;
   return jobs.length;
 }
 
@@ -247,6 +256,7 @@ async function run(body: Record<string, unknown>) {
     select c.id, coalesce(c.name_en, c.name) as name, c.domain, c.careers_url, l.round_id, l.stage, l.amount_usd, l.announced_on, a.source, a.slug
     from latest l join wgf.companies c on c.id = l.company_id left join wgf.company_ats a on a.company_id = c.id
     where ${due()} order by l.announced_on desc limit ${limit}`;
+  await sql`update wgf.jobs set active = false where active and expires_on < current_date`;
   let refreshed = 0, roles = 0, failed = 0, added = 0;
   await Promise.all(cos.map(async (c) => {
     let src = c.source, slug = c.slug, fromCareers = false;
@@ -269,6 +279,74 @@ async function run(body: Record<string, unknown>) {
   return { processed: cos.length, refreshed, added_from_careers_page: added, feed_unreachable: failed, roles, remaining: left.n };
 }
 
+
+// ---------- feeds ----------
+const bareDomain = (d: unknown) => String(d ?? "").toLowerCase().trim().replace(/^https?:\/\//, "").replace(/^www\./, "").split(/[/?#]/)[0];
+
+async function feedTargets() {
+  const rows = await sql`
+    with latest as (${LATEST()})
+    select distinct on (d) lower(regexp_replace(c.domain, '^www\.', '')) as d, a.feed_at
+    from latest l join wgf.companies c on c.id = l.company_id left join wgf.company_ats a on a.company_id = c.id
+    where c.domain is not null and c.domain <> '' and a.source is null
+    order by d, l.announced_on desc`;
+  const backfill = rows.filter((r) => !r.feed_at).map((r) => r.d).slice(0, 1000);
+  const daily = rows.filter((r) => r.feed_at).map((r) => r.d).slice(0, 1000);
+  return { backfill, daily, count: backfill.length + daily.length };
+}
+
+const addDaysIso = (d: string | null, n: number) => { const t = d ? Date.parse(d) : Date.now(); return new Date((isNaN(t) ? Date.now() : t) + n * 864e5).toISOString().slice(0, 10); };
+
+async function ingest(body: Record<string, unknown>) {
+  const src = String(body.source);
+  const items = Array.isArray(body.items) ? body.items.slice(0, 2000) : [];
+  const cos = await sql`
+    with latest as (${LATEST()})
+    select c.id, coalesce(c.name_en, c.name) as name, c.domain, l.round_id, l.stage, l.amount_usd
+    from latest l join wgf.companies c on c.id = l.company_id`;
+  const byDomain = new Map<string, any>(), byName = new Map<string, any[]>();
+  for (const c of cos) {
+    if (c.domain) byDomain.set(bareDomain(c.domain), c);
+    const k = cleanName(c.name); if (k) byName.set(k, [...(byName.get(k) ?? []), c]);
+  }
+  const groups = new Map<number, { c: any; jobs: Job[] }>();
+  let unmatched = 0;
+  for (const it of items as any[]) {
+    let c: any = null, job: Job | null = null;
+    if (src === "fantastic") {
+      c = byDomain.get(bareDomain(it.domain_derived)) ?? byDomain.get(bareDomain(it.organization_url));
+      const et = (Array.isArray(it.ai_employment_type) ? it.ai_employment_type : []).map((x: string) => x.replace(/_/g, " ").toLowerCase()).join(", ");
+      job = { external_id: `fj-${it.id}`, title: String(it.title ?? ""), location: (it.locations_derived ?? [])[0] ?? null,
+        remote: /remote/i.test(String(it.ai_work_arrangement ?? "")), employment_type: et || null, posted_on: day(it.date_posted),
+        url: String(it.url ?? ""), text: String(it.description_text ?? "").slice(0, 4000) };
+      (job as any).valid = day(it.date_valid_through);
+    } else if (src === "wwr") {
+      const k = cleanName(it.company);
+      const hits = k.length >= 5 ? byName.get(k) ?? [] : [];
+      c = hits.length === 1 ? hits[0] : null;   // exact, unique name only
+      job = { external_id: `ww-${String(it.link ?? "").split("/").pop()}`, title: String(it.title ?? ""), location: it.region ? `Remote · ${it.region}` : "Remote",
+        remote: true, employment_type: it.type ?? null, posted_on: day(it.pubDate), url: String(it.link ?? "") };
+    }
+    if (!c || !job || !job.title || !job.url) { unmatched++; continue; }
+    const g = groups.get(Number(c.id)) ?? { c, jobs: [] };
+    g.jobs.push(job); groups.set(Number(c.id), g);
+  }
+  let roles = 0;
+  for (const { c, jobs } of groups.values()) {
+    roles += await storeBoard(c, { source: src, slug: "", jobs }, {
+      close: false, solo: false, via: src === "wwr" ? "We Work Remotely" : null,
+      expires: (j) => (j as any).valid && (j as any).valid >= addDaysIso(null, 0) ? (j as any).valid : addDaysIso(j.posted_on ?? null, 45),
+    });
+  }
+  const marks = Array.isArray(body.mark_domains) ? body.mark_domains.map(bareDomain).filter(Boolean) : [];
+  if (marks.length) {
+    const ids = cos.filter((c) => c.domain && marks.includes(bareDomain(c.domain))).map((c) => Number(c.id));
+    if (ids.length) await sql`insert into wgf.company_ats (company_id, feed_at) select unnest(${ids}::bigint[]), now()
+      on conflict (company_id) do update set feed_at = coalesce(wgf.company_ats.feed_at, now())`;
+  }
+  return { received: items.length, companies: groups.size, roles, unmatched, marked: marks.length };
+}
+
 Deno.serve(async (req) => {
   if (req.method !== "POST") return json({ error: "POST only" }, 405);
   const [cfg] = await sql`select value from wgf.config where key = 'ingest_token'`;
@@ -278,7 +356,9 @@ Deno.serve(async (req) => {
     if (body.mode === "targets") return json(await targets(body));
     if (body.mode === "boards") return json(await boards(body));
     if (body.mode === "run") return json(await run(body));
-    return json({ error: "mode must be targets, boards or run" }, 400);
+    if (body.mode === "feed_targets") return json(await feedTargets());
+    if (body.mode === "ingest") return json(await ingest(body));
+    return json({ error: "mode must be targets, boards, run, feed_targets or ingest" }, 400);
   } catch (e) {
     return json({ error: String((e as Error).message ?? e) }, 500);
   }

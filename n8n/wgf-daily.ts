@@ -491,85 +491,144 @@ const saveLinks = node({
 });
 
 // ---------- Agent 2c: Jobs ----------
-// 1. One Google search (Serper) per company finds its job board on Ashby, Greenhouse, Lever, Workable, SmartRecruiters, Recruitee or Personio.
-//    Each company is searched at most once every 30 days; wgf-jobs keeps a board only when it belongs to the company.
-// 2. Every known board's public feed is read once a day for open roles (20 companies a call).
+// 1. Fantastic.jobs (Apify): key-role titles posted on 58 job-board systems and 275k careers pages, for the domains of startups
+//    funded in the last year. New domains get six months of history once; after that, the last 24 hours each night.
+// 2. We Work Remotely RSS (free, credited): remote roles at funded startups, matched by exact company name.
+// 3. Boards we already know (found earlier) are read directly from their free public feeds.
 const JOBS = 'https://cxtcwslqzrzjaulqcvvu.supabase.co/functions/v1/wgf-jobs';
-const serperCred = { httpHeaderAuth: { id: 'VWIAhIiT5qDScXNy', name: 'Serper API' } };
-const boardTargets = node({
+const feedTargets = node({
   type: 'n8n-nodes-base.httpRequest',
   version: 4.4,
   config: {
-    name: 'Boards to find', executeOnce: true,
+    name: 'Domains for jobs feed', executeOnce: true,
     parameters: {
       method: 'POST', url: JOBS, sendHeaders: true, headerParameters: headers,
-      sendBody: true, contentType: 'json', specifyBody: 'json',
-      jsonBody: expr(`{{ JSON.stringify({ mode: "targets", limit: ${RUN} === "jobs_only" ? 200 : 60 }) }}`),
+      sendBody: true, contentType: 'json', specifyBody: 'json', jsonBody: '{ "mode": "feed_targets" }',
       options: { timeout: 60000, ...lenient },
     },
   },
 });
-const anyBoards = ifElse({
+const feedRuns = node({
+  type: 'n8n-nodes-base.code',
+  version: 2,
+  config: {
+    name: 'Feed requests', alwaysOutputData: true,
+    parameters: {
+      mode: 'runOnceForAllItems',
+      jsCode: `const t = $input.first().json || {};
+const out = [];
+const add = (range, list) => { for (let i = 0; i < list.length; i += 200) out.push({ json: { range, domains: list.slice(i, i + 200) } }); };
+add('6m', t.backfill || []);
+add('24h', t.daily || []);
+return out.length ? out : [{ json: { range: 'none', domains: [] } }];`,
+    },
+  },
+});
+const anyFeed = ifElse({
   version: 2.2,
   config: {
-    name: 'Any boards to find',
+    name: 'Any domains',
     parameters: {
       conditions: {
         options: { caseSensitive: true, leftValue: '', typeValidation: 'loose' },
-        conditions: [{ leftValue: expr('{{ $json.count }}'), rightValue: 0, operator: { type: 'number', operation: 'gt' } }],
+        conditions: [{ leftValue: expr('{{ $json.domains.length }}'), rightValue: 0, operator: { type: 'number', operation: 'gt' } }],
         combinator: 'and',
       },
     },
   },
 });
-const boardQueries = node({
-  type: 'n8n-nodes-base.code',
-  version: 2,
-  config: { name: 'One search per company', parameters: { mode: 'runOnceForAllItems', jsCode: `return ($input.first().json.queries || []).map(q => ({ json: q }));` } },
-});
-const searchBoards = node({
+const fantastic = node({
   type: 'n8n-nodes-base.httpRequest',
   version: 4.4,
   config: {
-    name: 'Search job boards (Serper)',
-    onError: 'continueRegularOutput',
+    name: 'Jobs feed (Fantastic.jobs)',
+    onError: 'continueRegularOutput', alwaysOutputData: true,
     parameters: {
-      method: 'POST', url: 'https://google.serper.dev/search',
-      authentication: 'genericCredentialType', genericAuthType: 'httpHeaderAuth',
+      method: 'POST', ...apify,
+      url: 'https://api.apify.com/v2/acts/fantastic-jobs~career-site-job-listing-api/run-sync-get-dataset-items?timeout=280&maxTotalChargeUsd=1',
       sendBody: true, contentType: 'json', specifyBody: 'json',
-      jsonBody: expr('{{ JSON.stringify({ q: $json.q, num: 10 }) }}'),
-      options: { timeout: 30000, batching: { batch: { batchSize: 5, batchInterval: 1000 } }, ...lenient },
+      jsonBody: expr('{{ JSON.stringify({ timeRange: $json.range, limit: 2000, domainFilter: $json.domains, descriptionType: "text", titleSearch: ["Founding:*", "Founder:*", "First", "Head", "Director", "VP", "Vice", "Chief", "CTO", "CFO", "COO", "CMO", "CRO", "CPO", "Lead", "Principal", "Staff", "Fractional", "Interim", "General", "Country"], titleExclusionSearch: ["Intern:*", "Junior", "Graduate", "Trainee", "Apprentice", "Werkstudent:*", "Student"] }) }}'),
+      options: { timeout: 300000, batching: { batch: { batchSize: 1, batchInterval: 1000 } }, response: { response: { responseFormat: 'json' } } },
     },
-    credentials: serperCred,
+    credentials: apifyCred,
   },
 });
-const collectBoards = node({
+const collectFeed = node({
   type: 'n8n-nodes-base.code',
   version: 2,
   config: {
-    name: 'Collect board results',
+    name: 'Collect feed roles',
     parameters: {
       mode: 'runOnceForAllItems',
-      jsCode: `const qs = $('One search per company').all();
-// a failed search (no organic list) is skipped, so the company is searched again next run
-const items = $input.all().map((r, i) => ({ company_id: qs[i] && qs[i].json.company_id, ok: Array.isArray(r.json.organic), organic: (r.json.organic || []).map(o => ({ link: o.link, title: o.title, snippet: o.snippet })) })).filter(x => x.company_id && x.ok).map(x => ({ company_id: x.company_id, organic: x.organic }));
+      jsCode: `const rows = $input.all().map(i => i.json);
+const failed = rows.some(r => r.error);
+const jobs = rows.filter(r => r && r.id && r.title).map(r => ({ id: r.id, title: r.title, url: r.url, domain_derived: r.domain_derived, organization_url: r.organization_url,
+  locations_derived: r.locations_derived, ai_work_arrangement: r.ai_work_arrangement, ai_employment_type: r.ai_employment_type, date_posted: r.date_posted,
+  date_valid_through: r.date_valid_through, description_text: String(r.description_text || '').slice(0, 1500) }));
+// domains that got their six-month history are marked only when every feed call succeeded
+const marks = failed ? [] : $('Feed requests').all().filter(i => i.json.range === '6m').flatMap(i => i.json.domains);
 const out = [];
-for (let i = 0; i < items.length; i += 15) out.push({ json: { items: items.slice(i, i + 15) } });   // 15 companies per save call
-return out.length ? out : [{ json: { items: [] } }];`,
+for (let i = 0; i < jobs.length; i += 300) out.push({ json: { source: 'fantastic', items: jobs.slice(i, i + 300), mark_domains: i === 0 ? marks : [] } });
+return out.length ? out : [{ json: { source: 'fantastic', items: [], mark_domains: marks } }];`,
     },
   },
 });
-const saveBoards = node({
+const saveFeed = node({
   type: 'n8n-nodes-base.httpRequest',
   version: 4.4,
   config: {
-    name: 'Save boards',
+    name: 'Save feed roles',
     onError: 'continueRegularOutput',
     parameters: {
       method: 'POST', url: JOBS, sendHeaders: true, headerParameters: headers,
       sendBody: true, contentType: 'json', specifyBody: 'json',
-      jsonBody: expr('{{ JSON.stringify({ mode: "boards", items: $json.items }) }}'),
+      jsonBody: expr('{{ JSON.stringify({ mode: "ingest", source: $json.source, items: $json.items, mark_domains: $json.mark_domains }) }}'),
       options: { timeout: 150000, batching: { batch: { batchSize: 1, batchInterval: 500 } }, ...lenient },
+    },
+  },
+});
+const wwrRead = node({
+  type: 'n8n-nodes-base.httpRequest',
+  version: 4.4,
+  config: {
+    name: 'We Work Remotely feed', executeOnce: true,
+    onError: 'continueRegularOutput', alwaysOutputData: true,
+    parameters: {
+      method: 'GET', url: 'https://weworkremotely.com/remote-jobs.rss',
+      options: { timeout: 60000, response: { response: { neverError: true, responseFormat: 'text' } } },
+    },
+  },
+});
+const wwrParse = node({
+  type: 'n8n-nodes-base.code',
+  version: 2,
+  config: {
+    name: 'Read WWR roles',
+    parameters: {
+      mode: 'runOnceForAllItems',
+      jsCode: `const x = String(($input.first() && $input.first().json.data) || '');
+const tag = (b, t) => { const m = new RegExp('<' + t + '>(?:<!\\\\[CDATA\\\\[)?([\\\\s\\\\S]*?)(?:\\\\]\\\\]>)?</' + t + '>', 'i').exec(b); return m ? m[1].trim() : null; };
+const items = [];
+for (const m of x.matchAll(/<item>([\\s\\S]*?)<\\/item>/gi)) {
+  const b = m[1], full = tag(b, 'title') || '', i = full.indexOf(': ');
+  if (i < 1) continue;
+  items.push({ company: full.slice(0, i), title: full.slice(i + 2), link: tag(b, 'link') || tag(b, 'guid'), region: tag(b, 'region'), type: tag(b, 'type'), pubDate: tag(b, 'pubDate') });
+}
+return [{ json: { source: 'wwr', items, mark_domains: [] } }];`,
+    },
+  },
+});
+const saveWwr = node({
+  type: 'n8n-nodes-base.httpRequest',
+  version: 4.4,
+  config: {
+    name: 'Save WWR roles',
+    onError: 'continueRegularOutput',
+    parameters: {
+      method: 'POST', url: JOBS, sendHeaders: true, headerParameters: headers,
+      sendBody: true, contentType: 'json', specifyBody: 'json',
+      jsonBody: expr('{{ JSON.stringify({ mode: "ingest", source: "wwr", items: $json.items }) }}'),
+      options: { timeout: 120000, ...lenient },
     },
   },
 });
@@ -775,8 +834,8 @@ sticky(`## Agent 2b · Link finder
 Google searches for each missing company website, company LinkedIn and X, and founder LinkedIn and X. A link is kept only when the result names the person and the company.`,
   [linkTargets, anyLinks, startLinkSearch, waitLinks, linkSearchDone, getLinks, matchLinks, saveLinks], { color: 3 });
 sticky(`## Agent 2c · Jobs
-One Google search (Serper) per company finds its job board. Each board's public feed is then read daily. Tags each role by function and seniority, and marks founding, remote and fractional roles.`,
-  [boardTargets, anyBoards, boardQueries, searchBoards, collectBoards, saveBoards, jobBatches, findJobs], { color: 2 });
+Key roles at startups funded in the last year: Fantastic.jobs feed by company domain (job boards and careers pages), We Work Remotely RSS for remote roles, and the free public feeds of boards we already know. Tags each role by function and seniority, and marks founding, remote and fractional roles.`,
+  [feedTargets, feedRuns, anyFeed, fantastic, collectFeed, saveFeed, wwrRead, wwrParse, saveWwr, jobBatches, findJobs], { color: 2 });
 sticky(`## Agent 3 · Verifier
 Gemini Flash + Google Search checks each round was first announced on the day. Big or unclear rounds get a Claude Sonnet second opinion. Test mode scores it on the hand-checked gold set.`,
   [geminiTargets, geminiSplit, anyGemini, gemini, saveGemini, claudeTargets, claudeSplit, anyClaude, claudeCheck, saveClaude, verified, isTest, scorePipeline, scoreGemini], { color: 6 });
@@ -791,7 +850,7 @@ export default workflow('wgf-daily', 'WGF — Daily pipeline (9pm)')
     .onCase(1, geminiTargets)
     .onCase(2, geminiTargets)
     .onCase(3, linkTargets)
-    .onCase(4, boardTargets))
+    .onCase(4, feedTargets))
   .add(schedule)
   .to(is9pm)
   .to(nightly)
@@ -817,10 +876,14 @@ export default workflow('wgf-daily', 'WGF — Daily pipeline (9pm)')
   .to(saveDomains)
   .to(recheck)
   .to(linkTargets)
-  .to(anyLinks.onTrue(startLinkSearch.to(waitLinks.to(linkSearchDone.to(getLinks.to(matchLinks.to(saveLinks.to(boardTargets))))))).onFalse(boardTargets))
-  .add(boardTargets)
-  .to(anyBoards.onTrue(boardQueries.to(searchBoards.to(collectBoards.to(saveBoards.to(jobBatches))))).onFalse(jobBatches))
-  .add(jobBatches)
+  .to(anyLinks.onTrue(startLinkSearch.to(waitLinks.to(linkSearchDone.to(getLinks.to(matchLinks.to(saveLinks.to(feedTargets))))))).onFalse(feedTargets))
+  .add(feedTargets)
+  .to(feedRuns)
+  .to(anyFeed.onTrue(fantastic.to(collectFeed.to(saveFeed.to(wwrRead)))).onFalse(wwrRead))
+  .add(wwrRead)
+  .to(wwrParse)
+  .to(saveWwr)
+  .to(jobBatches)
   .to(findJobs)
   .add(recheck)
   .to(hasDomains)

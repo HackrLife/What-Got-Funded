@@ -373,7 +373,7 @@ function jobsCsv(jobs) {
   return "﻿" + [cols.join(","), ...jobs.map((j) => [j.company, j.domain ? `https://${j.domain}` : "", j.amount_usd ? Math.round(j.amount_usd) : "", STAGE[j.stage] || "", j.announced_on,
     j.title, FN_LABEL[j.function] || "", SEN_LABEL[j.seniority] || "IC", j.founding ? "yes" : "", j.remote ? "yes" : "", j.fractional ? "yes" : "", j.location, j.posted_on, j.url].map(q).join(","))].join("\r\n") + "\r\n";
 }
-function jobsPage(allJobs, published, today, hrefOf) {
+function jobsPage(allJobs, published, today, hrefOf, hiringAll = []) {
   const since = (d, n) => d && d >= addDays(today, -n);
   // only roles that matter: founding, leadership, remote or fractional, minus junior and generic roles (wgf-jobs sets key_role)
   const jobs = allJobs.filter((j) => j.key_role);
@@ -394,7 +394,7 @@ function jobsPage(allJobs, published, today, hrefOf) {
   const chip = (t) => `<span class="jtag t-${slugify(t)}">${esc(t)}</span>`;
   const roleRow = (j, withCo = false) => `<li class="role" data-fn="${j.function}" data-tags="${[j.founding && "founding", j.remote && "remote", j.fractional && "fractional"].filter(Boolean).join(" ")}" data-tab="${j.tab}">
     <div class="rt"><a class="rtitle" href="${esc(j.url)}" rel="noopener nofollow" target="_blank">${esc(j.title)}</a>${withCo ? `<span class="rco">at <a href="${hrefOf(j.company_id) || (j.domain ? `https://${j.domain}` : "#")}">${esc(j.company)}</a></span>` : ""}
-      <div class="rmeta">${tags(j).map(chip).join("")}<span>${esc(FN_LABEL[j.function] || "")}</span>${j.location ? `<span>${esc(j.location)}</span>` : ""}${j.posted_on ? `<span>Posted ${esc(shortDate(j.posted_on))}</span>` : ""}</div></div>
+      <div class="rmeta">${tags(j).map(chip).join("")}<span>${esc(FN_LABEL[j.function] || "")}</span>${j.location ? `<span>${esc(j.location)}</span>` : ""}${j.posted_on ? `<span>Posted ${esc(shortDate(j.posted_on))}</span>` : ""}${j.via ? `<span class="via">via ${esc(j.via)}</span>` : ""}</div></div>
     <a class="apply" href="${esc(j.url)}" rel="noopener nofollow" target="_blank">Apply</a></li>`;
   const coCard = (g) => {
     const j0 = g.j0, c = contOf(continentOf(j0.hq_country ? countryLabel(j0.hq_country) : null));
@@ -406,15 +406,29 @@ function jobsPage(allJobs, published, today, hrefOf) {
   <ul class="roles">${g.rows.map((j) => roleRow(j)).join("")}</ul>
 </article>`;
   };
+  // Hiring signal: just-funded startups that said the money pays for hiring but have no key roles posted yet
+  const shown = new Set(groups.map((g) => g.j0.company_id));
+  const hiring = hiringAll.filter((h) => !shown.has(h.company_id) && since(h.announced_on, 45)).sort((a, b) => (b.announced_on || "").localeCompare(a.announced_on || "") || (b.amount_usd || 0) - (a.amount_usd || 0));
+  const sigCard = (h) => {
+    const c = contOf(continentOf(h.hq_country ? countryLabel(h.hq_country) : null));
+    const raised = [usd(h.amount_usd), STAGE[h.stage] && STAGE[h.stage] !== "Not stated" ? STAGE[h.stage] : "", `announced ${shortDate(h.announced_on)}`].filter(Boolean).join(" · ");
+    const site = h.careers_url || (h.domain ? `https://${h.domain}` : null);
+    return `<article class="hco hsig" style="--c:${c.color}">
+  <header><div><h3><a href="${hrefOf(h.company_id) || site || "#"}">${esc(h.company)}</a></h3><div class="hraised">Raised ${esc(raised)}${h.hq_country ? ` · ${esc(countryLabel(h.hq_country))}` : ""}</div></div></header>
+  <p class="why"><b>What the money is for</b>${esc(h.use_of_funds)}</p>
+  <div class="sigacts">${h.source_url ? `<a href="${esc(h.source_url)}" rel="noopener nofollow" target="_blank">Read the announcement</a>` : ""}${site ? `<a href="${esc(site)}" rel="noopener nofollow" target="_blank">${h.careers_url ? "Careers page" : "Company website"}</a>` : ""}${h.linkedin_url ? `<a href="${esc(h.linkedin_url)}" rel="noopener nofollow" target="_blank">LinkedIn</a>` : ""}</div>
+</article>`;
+  };
+  const sigBlock = hiring.length ? `<section class="block" id="signals"><h2>Hiring, no roles posted yet</h2><p class="sub2">Startups funded in the last 45 days whose announcement says the money pays for hiring. Their roles are not on a public job board yet, so the way in is the company itself.</p><div class="hcos sigs">${hiring.map(sigCard).join("\n")}</div></section>` : "";
   const fnCounts = new Map(); for (const j of all) fnCounts.set(j.function, (fnCounts.get(j.function) || 0) + 1);
   const fnChips = [`<button type="button" class="on" data-fn="all">All functions</button>`, ...Object.keys(FN_LABEL).filter((k) => fnCounts.get(k)).map((k) => `<button type="button" data-fn="${k}">${FN_LABEL[k]} ${fnCounts.get(k)}</button>`)].join("");
   const nFresh = groups.filter((g) => g.tab === "fresh").length, nHot = groups.filter((g) => g.tab === "hot").length;
-  const empty = `<div class="jempty"><h3>Roles are being collected</h3><p>Every night we read the public job boards of every startup that raised in the last year and keep only the roles that shape a company: founding hires, leaders, and remote or fractional roles. The first roles appear after the next run.</p></div>`;
+  const empty = `<div class="jempty"><h3>Roles are being collected</h3><p>Every night we collect the open roles of every startup that raised in the last year, from job boards, careers pages and remote job feeds, and keep only the roles that shape a company: founding hires, leaders, and remote or fractional roles.</p></div>`;
   const body = `<div class="wrap jobs2">
 <section class="hero2"><p class="kick">Jobs</p>
   <h1>The first hires at startups that just raised.</h1>
-  <p class="lede">Founding, leadership, remote and fractional roles at startups funded in the last 30 days, and at the year's hottest startups. Every role comes from the company's own job board and links straight to it.</p>
-  <div class="stats"><div><span class="sv">${all.length}</span><span class="sl">key roles open</span></div><div><span class="sv">${nFresh}</span><span class="sl">just-funded startups hiring</span></div><div><span class="sv">${all.filter((j) => j.founding).length}</span><span class="sl">founding roles</span></div></div>
+  <p class="lede">Founding, leadership, remote and fractional roles at startups funded in the last 30 days, and at the year's hottest startups. Every role links straight to the company's own posting, and startups that raised to hire but have not posted roles yet are listed too.</p>
+  <div class="stats"><div><span class="sv">${all.length}</span><span class="sl">key roles open</span></div><div><span class="sv">${nFresh}</span><span class="sl">just-funded startups hiring</span></div><div><span class="sv">${all.filter((j) => j.founding).length}</span><span class="sl">founding roles</span></div><div><span class="sv">${hiring.length}</span><span class="sl">hiring, no roles posted yet</span></div></div>
   <div class="acts"><a class="btn2" href="/data/jobs.csv" download>${ICON_DL}Download roles as CSV</a></div>
 </section>
 ${all.length ? `
@@ -426,8 +440,9 @@ ${all.length ? `
   <div class="hcos">${groups.map(coCard).join("\n")}</div>
   <p class="jnone" hidden>No roles match these filters.</p>
 </section>` : empty}
+${sigBlock}
 </div>${joinBand()}`;
-  return shell({ title: "Founding and leadership roles at newly funded startups | What Got Funded", desc: "Founding, leadership, remote and fractional roles at startups that just raised, straight from their own job boards.", active: "Jobs", body, canonical: "/jobs/", scripts: BEEHIIV_SCRIPT });
+  return shell({ title: "Founding and leadership roles at newly funded startups | What Got Funded", desc: "Founding, leadership, remote and fractional roles at startups that just raised, and the startups that raised to hire.", active: "Jobs", body, canonical: "/jobs/", scripts: BEEHIIV_SCRIPT });
 }
 
 function methodologyPage() {
@@ -624,7 +639,7 @@ async function main() {
   write("investors/index.html", investorsPage(published.filter((r) => r.announced_on >= monthFrom), monthFrom, homeDay));
   {
     const hrefs = new Map(published.map((r) => [r.company_id, r.href]));
-    write("jobs/index.html", jobsPage(data.jobs || [], published, today, (id) => hrefs.get(id)));
+    write("jobs/index.html", jobsPage(data.jobs || [], published, today, (id) => hrefs.get(id), data.hiring || []));
     write("data/jobs.csv", jobsCsv((data.jobs || []).filter((j) => j.key_role)));
   }
   write("about/index.html", aboutPage());
