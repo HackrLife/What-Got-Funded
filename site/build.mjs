@@ -507,7 +507,7 @@ function methodologyPage() {
 <p>Equity or venture rounds raised by startups and private growth companies: pre-seed, seed, angel, Series A onwards, growth equity, and strategic investments in startups.</p>
 <p>Excluded, with the reason recorded: debt and venture debt, grants and prizes, funds raised by investors, IPOs and raises by public companies, acquisitions and mergers, secondary share sales, private equity buyouts, and rounds that are only reported as talks or plans.</p>
 <h2>How each round is built</h2>
-<ul><li>Each story is read by a language model instructed to use only what the source states. Values the source does not state stay empty and show as "not stated".</li>
+<ul><li>Each story is recorded using only what the source states. Values the source does not state stay empty and show as "not stated".</li>
 <li>The same round reported by several sources is merged into one record: same company, compatible stage, announced within 14 days.</li>
 <li>Amounts are converted to US dollars at the European Central Bank's daily reference rate. Totals count disclosed amounts only.</li>
 <li>Rounds announced more than 30 days before we first saw them, and reports that do not name the company, are kept out of the daily figures.</li></ul>
@@ -558,71 +558,77 @@ ${l.map((s) => `<tr><td><a class="u" href="${esc(s.homepage)}" rel="nofollow noo
 </tbody></table></details>`;
     }).join("\n");
 
-  const steps = [
-    ["Scraper", "Collects the day's funding news from every source and local-language search, for the previous day.", "Apify", "#f9a825"],
-    ["Structurer", "Reads each story in its own language and records the company, amount, stage, investors and founders in English.", "Claude Haiku", "#3d5afe"],
-    ["Verifier", "Finds the first public report of each round and opens the page to confirm its real publish date.", "Gemini + Google Search, Claude Sonnet", "#00897b"],
-    ["Curator", "Merges duplicates, removes old rounds and non-equity deals, and picks the stories that lead the day.", "Claude Sonnet", "#e53935"],
-    ["Article publisher", "Builds the daily edition: the charts, every startup as a card, and the free CSV download.", "Vercel", "#8e24aa"],
-    ["Newsletter publisher", "Prepares the morning email with the day's top 20 startups and a link to the full edition.", "Beehiiv", "#172033"],
-  ];
-  const pipe = `<div class="pipe" role="img" aria-label="The daily pipeline: six agents from scraping to newsletter">
-  <div class="orch"><span class="pill">n8n</span><span>One workflow runs the six agents <b>every day</b>. Every round, source and check is stored in <b>Supabase</b>.</span></div>
-  <ol>${steps.map(([h, p, t, c], i) => `<li style="--c:${c}"><span class="n">STEP ${i + 1}</span><h3>${h}</h3><p>${p}</p><span class="tool">${t}</span></li>`).join("")}</ol>
-  <div class="out"><b style="color:var(--ink)">What comes out:</b><span>Daily edition on the site</span><span>Daily newsletter</span><span>CSV of every round</span><span>Analysis</span></div>
-</div>`;
   const block = (k, c, h, inner, wide = false) => `<section class="pblock${wide ? " wide" : ""}" style="--c:${c}"><span class="pk"><i></i>${k}</span><h3>${h}</h3>${inner}</section>`;
+  const t = (cls, inner, style = "") => `<div class="mt ${cls}"${style ? ` style="${style}"` : ""}>${inner}</div>`;
+  const pairs = [
+    ["Too big to use", "Funding databases list hundreds of thousands of startups, with strict caps on how many you can download and prices that climb quickly as you need more. No rep, agency or freelancer can contact that many anyway, so most of a paid list is never touched and the few companies that fit are buried in it.",
+     "One day at a time", "Each edition holds only the startups that announced a round the day before, usually dozens to a few hundred. That keeps it manageable rather than overwhelming: one person can read, sort and work through it before the day is out, and download all of it for free.", "#f9a825"],
+    ["Too late to matter", "A startup is most open to new tools, services and hires in the weeks after it raises. Monthly reports and quarterly lists arrive after that window, when the budget is planned, the first vendors are chosen and the founders' inboxes are full.",
+     "First, not last", "Every round reaches you the morning after it is announced, while the money is new and the plans are still being made. A fresh list each day asks you to act on it that day, and acting immediately is what wins a startup's attention before everyone else's message arrives.", "#00897b"],
+    ["Too thin to act on", "A company name and an amount do not start a conversation. You still need to know who founded it, where to find them, who invested, what the money is for and whether it fits what you sell, and gathering that takes longer than the outreach itself.",
+     "Ready to reach out", "Each startup comes with its founders and their LinkedIn, the lead and other investors, its website and socials, and what it plans to spend on. Tick the ones that fit and export them to a CSV, your CRM or LinkedIn notes.", "#3d5afe"],
+  ];
   const who = [
-    ["Account executives", "Reach a startup in the weeks after it raises, while the budget for new tools and services is being set."],
-    ["Sales development reps", "Start each day with a short, fresh list of funded companies, their founders and LinkedIn profiles, and a note ready to send."],
-    ["Inbound teams", "Spot newly funded companies already in your pipeline and move them to the top of the queue."],
-    ["Marketers", "Aim ads, content and events at the sectors and markets raising money right now."],
-    ["Agency owners", "Offer design, growth, recruiting or engineering help to startups that just raised and are about to spend on exactly that."],
-    ["Solopreneurs and freelancers", "Find the founders who now have budget for fractional help, and contact them before larger firms do."],
-    ["ISVs and software vendors", "Find funded startups in your target sectors and reach them while they are still choosing the tools they will build on."],
-    ["Investors", "Track who is backing what, find co-investors, and see which sectors and markets are heating up."],
-    ["Researchers and analysts", "Study where capital flows by region, sector and stage, with every round linked to its source and free to download."],
-    ["Startup founders", "See which investors are writing cheques in your space, and compare your round with your peers'."],
+    ["Account executives", "Reach startups while the new budget is being set.", "w2", "#172033"],
+    ["SDRs", "A short, fresh list every morning.", "", "#ffffff"],
+    ["Inbound teams", "Fast-track funded leads already in your pipeline.", "", "#f7f8fa"],
+    ["Marketers", "Target the sectors and markets raising now.", "", "#f7f8fa"],
+    ["Agency owners", "Pitch the services they just raised money to buy.", "w2", "#ffffff"],
+    ["Freelancers", "Offer fractional help before the big firms do.", "", "#f7f8fa"],
+    ["ISVs", "Get chosen before the stack is set.", "", "#ffffff"],
+    ["Investors", "See who is backing what, and where.", "", "#f7f8fa"],
+    ["Researchers", "Every round sourced and free to download.", "", "#ffffff"],
+    ["Founders", "Know who is writing cheques in your space.", "", "#f7f8fa"],
   ];
-  const deliver = [
-    ["Daily email", "Every startup that raised yesterday, a short analysis, and the top jobs at those startups. Free, every day.", "/subscribe/", "Subscribe"],
-    ["Today", "The day's startups as cards, with filters, tick boxes and exports for a CSV, your CRM or LinkedIn notes.", "/", "Open today"],
-    ["Explore", "Every round since launch, searchable by country, city, stage, sector and investor.", "/explore/", "Explore"],
-    ["Jobs", "Founding, leadership, remote and fractional roles at the startups that just raised.", "/jobs/", "See jobs"],
-    ["Digests", "A weekly digest every Sunday, a monthly digest in the first week of each month, and a yearly review.", "/editions/", "Read editions"],
+  const dark = (hex) => ["#172033", "#00897b", "#e53935", "#3d5afe", "#8e24aa"].includes(hex);
+  const ICO = {
+    mail: '<svg viewBox="0 0 24 24"><path d="M3 5h18v14H3z" fill="none" stroke="currentColor" stroke-width="2"/><path d="M3 6l9 7 9-7" fill="none" stroke="currentColor" stroke-width="2"/></svg>',
+    today: '<svg viewBox="0 0 24 24"><rect x="3" y="3" width="8" height="8" fill="currentColor"/><rect x="13" y="3" width="8" height="8" fill="currentColor" opacity=".6"/><rect x="3" y="13" width="8" height="8" fill="currentColor" opacity=".6"/><rect x="13" y="13" width="8" height="8" fill="currentColor"/></svg>',
+    explore: '<svg viewBox="0 0 24 24"><circle cx="10.5" cy="10.5" r="6.5" fill="none" stroke="currentColor" stroke-width="2.2"/><path d="M15.5 15.5L21 21" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></svg>',
+    jobs: '<svg viewBox="0 0 24 24"><path d="M9 4h6a1 1 0 0 1 1 1v2h4a1 1 0 0 1 1 1v11a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V8a1 1 0 0 1 1-1h4V5a1 1 0 0 1 1-1zm1 3h4V6h-4z" fill="currentColor"/></svg>',
+    digest: '<svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="1" fill="none" stroke="currentColor" stroke-width="2"/><path d="M3 10h18M8 3v4M16 3v4" stroke="currentColor" stroke-width="2"/></svg>',
+  };
+  const outs = [["mail", "Daily newsletter", "Sent to members, free", "/subscribe/", "#f9a825"], ["today", "Today", "Cards, filters, exports", "/", "#00897b"], ["explore", "Explore", "Every round, searchable", "/explore/", "#3d5afe"],
+    ["jobs", "Jobs", "Roles at funded startups", "/jobs/", "#e53935"], ["digest", "Digests", "Weekly, monthly, yearly", "/editions/", "#8e24aa"]];
+  const stepsShort = ["Curate", "Combine", "Map to filters", "Compile"];
+  const procs = [
+    ["1", "Collect", "#f9a825", `Over ${Math.floor(read.length / 100) * 100} public news sources across ${markets} markets, read through their RSS feeds every day.`],
+    ["2", "Curate", "#3d5afe", "Funding announcements picked out. Debt, grants, IPOs, acquisitions and old news left out."],
+    ["3", "Combine", "#00897b", "The same round reported by several sources merged into one record, linked to where it was first reported."],
+    ["4", "Map", "#e53935", "Every round mapped to the filters that matter: country, city, sector, stage, investor and amount."],
+    ["5", "Compile", "#8e24aa", "The day's edition built: every startup as a card, the analysis, the top jobs and a free CSV."],
+    ["6", "Send", "#172033", "The newsletter goes to every member, every day. All of it free."],
   ];
-  const body = `<div class="wrap about2">
-<section class="hero2"><p class="kick">About</p>
-  <h1>Funding data you can act on the same day.</h1>
-  <p class="lede">Databases of funded startups list hundreds of thousands of companies. Almost nobody can contact that many. What Got Funded gives you the startups that raised yesterday, every day: dozens to a few hundred companies, each with its founders, investors and links, ready for you to reach out before anyone else does.</p>
-  <div class="acts"><a class="btn2 dark" href="/subscribe/">Get it every day, free</a><a class="btn2" href="/explore/">Explore the data</a></div>
+  const body = `<div class="wrap about2 metro">
+<section class="mgrid hero-m">
+  ${t("m-hero", `<p class="mk">About What Got Funded</p><h1>Funding data you can act on the same day.</h1><p>Every startup that raised money yesterday, with its founders, investors and links. Free, every day.</p><div class="acts"><a class="btn2 m-pri" href="/subscribe/">Get it every day</a><a class="btn2 m-sec" href="/explore/">Explore the data</a></div>`, "background:#172033")}
+  ${t("m-sq m-line", `<b class="mbig">Yesterday</b><p>Every round announced the day before, in your inbox each morning.</p>`, "--c:#f9a825")}
+  ${t("m-sq m-line", `<b class="mbig">100s</b><p>A list you can work through in a day. Not 100,000s you never will.</p>`, "--c:#00897b")}
+  ${t("m-wide m-act", `<span class="mn">Ready to use</span><h3>Founders, investors and links. Export to a CSV, your CRM or LinkedIn notes.</h3>`)}
 </section>
-<section class="block"><h2>The problem</h2><p class="sub2">Selling to startups is a timing problem. A company is most open to new tools, services and hires in the weeks after it raises, and that window closes fast.</p>
-<div class="abcards">
-  <article><span class="abn">01</span><h3>Too big to use</h3><p>Funding databases hold hundreds of thousands of companies. A list that size cannot be worked by one rep, one agency or one founder, so most of it is never contacted.</p></article>
-  <article><span class="abn">02</span><h3>Too late to matter</h3><p>Monthly reports and quarterly lists arrive after the budget has been set and the first vendors have been chosen.</p></article>
-  <article><span class="abn">03</span><h3>Too thin to act on</h3><p>A company name and an amount are not enough. You need the founders, where to find them, who invested and what the money is for.</p></article>
-</div></section>
-<section class="block"><h2>The solution</h2><p class="sub2">One day's funding at a time. Small enough to work through, fresh enough to be first.</p>
-<div class="abcards">
-  <article><span class="abn">Daily</span><h3>Every startup that raised yesterday</h3><p>Across ${markets} markets and ${langs.size} languages, checked against the first public report of each round. Hundreds, not hundreds of thousands.</p></article>
-  <article><span class="abn">Complete</span><h3>Everything you need to reach out</h3><p>What the company does, where it is based, the amount and stage, the lead and other investors, the founders with their LinkedIn and X profiles, the company's website and socials, and what the money is for.</p></article>
-  <article><span class="abn">Actionable</span><h3>From list to outreach in minutes</h3><p>Filter, tick the startups that fit, and export them as a CSV, as a file ready for your CRM, or as LinkedIn notes with each founder's name filled in. Plus the top jobs at those startups. All free.</p></article>
-</div></section>
+
+<section class="block"><h2>The problem, and how we solve it</h2>
+<div class="mpairs">${pairs.map(([ph, pp, sh, sp, c], i) => `<div class="mpair">
+  ${t("m-prob", `<span class="mn">0${i + 1} · Problem</span><h3>${ph}</h3><p>${pp}</p>`)}
+  <span class="marrow" aria-hidden="true">→</span>
+  ${t("m-sol", `<span class="mn">Solution</span><h3>${sh}</h3><p>${sp}</p>`, `--c:${c}`)}
+</div>`).join("")}</div></section>
+
 <section class="block"><h2>Who it is for</h2>
-<div class="abwho">${who.map(([h, p]) => `<article><h3>${h}</h3><p>${p}</p></article>`).join("")}</div></section>
+<div class="mgrid who-m">${who.map(([h, p, w, c]) => t(`m-who ${w}`, `<h3>${h}</h3><p>${p}</p>`, `background:${c};${dark(c) ? "color:#fff" : ""}`)).join("")}</div></section>
+
 <section class="block"><h2>How we deliver it</h2>
-<div class="abdeliver">${deliver.map(([h, p, href, cta]) => `<a class="abd" href="${href}"><h3>${h}</h3><p>${p}</p><span>${cta} →</span></a>`).join("")}</div></section>
-<section class="block"><h2>How it works</h2><p class="sub2">Six agents run in one automated pipeline, every day.</p>${pipe}</section>
-<section class="block"><h2>The process in detail</h2>
-<div class="pblocks">
-${block("1 · Collect", "#f9a825", "Where the data comes from", `<p>We follow ${read.length} sources in ${markets} markets and ${langs.size} languages, listed in full below, plus ${searches} local-language news searches that pick up funding stories from outlets we do not follow directly.</p><p>They include startup and technology publications, business newspapers, regional startup media, investor and accelerator news pages, and press-release wires. We read each source's public feed or funding section, only where the publisher's robots.txt allows it, and never collect paywalled content.</p>`)}
-${block("2 · Structure", "#3d5afe", "How we process it", `<ul><li>Each funding story is read in full, whatever the language, and its details are recorded in English.</li><li>We take the company, what it does, where it is based, the amount and currency, the stage, the lead and other investors, and the founders, using only what the source states. Anything not stated stays blank.</li><li>Amounts in other currencies are converted to US dollars at the European Central Bank's reference rate on the day.</li><li>We add the company's official links (website, LinkedIn, X, careers page). The funding details come only from the news reports.</li></ul>`)}
-${block("3 · Verify", "#00897b", "How we check the date", `<p>Many sites re-post older deals days or weeks later with a new date. A round belongs to the day it was first announced, in the publisher's local time, so every new round is checked before it is published.</p><ul><li>A search model finds the earliest public report of the round, in English and in the local language.</li><li>We then open that report ourselves and read its real publish date. The model's answer only counts if the page exists, names the company and carries that date.</li><li>Large or unclear rounds get a second, independent check. Rounds that cannot be confirmed are held back.</li></ul>`)}
-${block("4 · Curate", "#e53935", "How we curate it", `<ul><li>The same round reported by several outlets becomes one entry, with every report listed as a source.</li><li>We include equity rounds raised by startups and private growth companies: pre-seed, seed, Series A onwards, growth and strategic investments.</li><li>We leave out debt, grants, funds raised by investors, IPOs, acquisitions, secondary sales, private equity buyouts, rumours and talks, old rounds reported again, and reports that do not name the company.</li></ul>`)}
-${block("5 · Analyse", "#8e24aa", "How we analyse it", `<p>Once the day's rounds are curated, we analyse them: the total raised, the split by continent and market, the sectors and stages attracting money, the largest rounds and the most active investors.</p><p>The daily edition covers each day's rounds. The weekly, monthly and longer analyses look at how funding is shifting over time. Every day's data can be downloaded as a CSV, free.</p>`)}
-${block("6 · Limits", "#9aa3b2", "What we may miss", `<p>Our coverage is only as complete as the news. Some rounds are never announced publicly, appear only on social media, or are reported only behind a paywall. Some details, such as the amount or the investors, are never disclosed and stay blank here.</p><p>If you know of a round we missed or got wrong, <a href="mailto:dev@hackrlife.com?subject=Missing%20or%20wrong%20round%20on%20What%20Got%20Funded">tell us</a> and we will add or fix it.</p>`)}
+<div class="mflow" role="img" aria-label="Over 300 public news sources are read every day, curated, combined, mapped to filters and compiled into the email, Today, Explore, Jobs and digests">
+  <div class="mf-in"><span class="mn">Every day</span><b>${Math.floor(read.length / 100) * 100}+</b><span>public news sources, read through their RSS feeds</span><b>${markets}</b><span>markets</span><b>${langs.size}</b><span>languages</span></div>
+  <div class="mf-arrow" aria-hidden="true"></div>
+  <div class="mf-core"><span class="mn">Then</span><h3>Curated and compiled</h3><ol>${stepsShort.map((s) => `<li>${s}</li>`).join("")}</ol></div>
+  <div class="mf-arrow" aria-hidden="true"></div>
+  <div class="mf-out">${outs.map(([i, h, p, href, c]) => `<a href="${href}" style="--c:${c}"><span class="mi">${ICO[i]}</span><b>${h}</b><small>${p}</small></a>`).join("")}</div>
 </div></section>
+
+<section class="block"><h2>The process</h2>
+<div class="mgrid proc-m">${procs.map(([n, h, c, p]) => t("m-proc", `<span class="mnum">${n}</span><h3>${h}</h3><p>${p}</p>`, `--c:${c}`)).join("")}</div>
+<p class="mmore"><a href="/methodology/">Read the full methodology →</a></p></section>
 <section class="block"><h2>Our sources</h2><p class="sub2">Open a region to see every source we follow there.</p>
 <div class="kpis2"><div><b>${read.length}</b><span>news sources</span></div><div><b>${searches}</b><span>local-language searches</span></div><div><b>${markets}</b><span>markets</span></div><div><b>${langs.size}</b><span>languages</span></div></div>
 <div class="regcards">
