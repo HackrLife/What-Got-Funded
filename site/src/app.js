@@ -144,8 +144,8 @@
 (function () {
   "use strict";
   document.querySelectorAll(".list").forEach(function (list) {
-    var box = list.querySelector(".units"); if (!box) return;
-    var units = Array.prototype.slice.call(box.querySelectorAll(".unit"));
+    var box = list.querySelector(".cards"); if (!box) return;
+    var units = Array.prototype.slice.call(box.querySelectorAll(".card"));
     var page = Number(box.getAttribute("data-page")) || 12, shown = page, filter = "all";
     var btn = list.querySelector(".more-btn"), chips = Array.prototype.slice.call(list.querySelectorAll(".chips button"));
     function match(u) { return filter === "all" || u.getAttribute("data-c") === filter; }
@@ -183,7 +183,7 @@
   var board = document.getElementById("board"); if (!board) return;
   var tab = "fresh", fn = "all";
   var tabs = [].slice.call(board.querySelectorAll(".tabs button")), chips = [].slice.call(board.querySelectorAll(".fnchips button"));
-  var toggles = [].slice.call(board.querySelectorAll(".toggles input")), cos = [].slice.call(board.querySelectorAll(".hco"));
+  var toggles = [].slice.call(board.querySelectorAll(".toggles input")), cos = [].slice.call(board.querySelectorAll(".jcard"));
   var none = board.querySelector(".jnone");
   function render() {
     var want = toggles.filter(function (t) { return t.checked; }).map(function (t) { return t.value; }), shown = 0;
@@ -193,9 +193,11 @@
         [].slice.call(co.querySelectorAll(".role")).forEach(function (r) {
           var tags = (r.getAttribute("data-tags") || "").split(" ");
           var ok = (fn === "all" || r.getAttribute("data-fn") === fn) && want.every(function (w) { return tags.indexOf(w) >= 0; });
-          r.hidden = !ok; if (ok) n++;
+          r.hidden = !ok || n >= 3; if (ok) n++;   // the card shows the first three matching roles
         });
       }
+      var more = co.querySelector(".c-more");
+      if (more) { more.hidden = n <= 3; more.textContent = "+ " + (n - 3) + " more " + (n - 3 === 1 ? "role" : "roles"); }
       co.hidden = n === 0; shown += n;
     });
     if (none) none.hidden = shown > 0;
@@ -204,4 +206,56 @@
   chips.forEach(function (b) { b.addEventListener("click", function () { fn = b.getAttribute("data-fn"); chips.forEach(function (x) { x.classList.toggle("on", x === b); }); render(); }); });
   toggles.forEach(function (t) { t.addEventListener("change", render); });
   render();
+})();
+
+// ---------- detail panel: clicking a card slides in its full details from the left ----------
+(function () {
+  "use strict";
+  var cards = document.querySelectorAll("[data-panel]"); if (!cards.length) return;
+  var wrap = document.createElement("div");
+  wrap.className = "pwrap"; wrap.hidden = true;
+  wrap.innerHTML = '<div class="pshade"></div><aside class="panel" role="dialog" aria-modal="true" aria-label="Details" tabindex="-1">' +
+    '<div class="pbar"><button type="button" class="pclose" aria-label="Close">&larr; Back</button><a class="pfullpage" href="#">Open full page</a></div><div class="pbody"></div></aside>';
+  document.body.appendChild(wrap);
+  var panel = wrap.querySelector(".panel"), body = wrap.querySelector(".pbody"), full = wrap.querySelector(".pfullpage");
+  var last = null, openId = null;
+  function open(card, push) {
+    var t = card.querySelector("template.full"); if (!t) return;
+    body.innerHTML = ""; body.appendChild(t.content.cloneNode(true));
+    var link = card.querySelector(".c-name a");
+    var href = link && link.getAttribute("href");
+    full.hidden = !href || href === "#" || /^https?:/.test(href); if (!full.hidden) full.href = href;
+    last = card; openId = card.id;
+    wrap.hidden = false; document.documentElement.classList.add("pnl-open");
+    requestAnimationFrame(function () { wrap.classList.add("on"); panel.focus(); });
+    body.scrollTop = 0;
+    if (push && history.pushState) history.pushState({ panel: card.id }, "", "#" + card.id);
+  }
+  function close(pop) {
+    if (wrap.hidden) return;
+    wrap.classList.remove("on"); document.documentElement.classList.remove("pnl-open");
+    setTimeout(function () { wrap.hidden = true; body.innerHTML = ""; }, 220);
+    if (!pop && history.state && history.state.panel) history.back();
+    if (last) last.focus({ preventScroll: true });
+    openId = null;
+  }
+  [].forEach.call(cards, function (card) {
+    card.setAttribute("tabindex", "0");
+    card.addEventListener("click", function (e) {
+      var a = e.target.closest("a");
+      if (a && (a.target === "_blank" || e.metaKey || e.ctrlKey || e.shiftKey)) return;   // outside links and new-tab clicks behave normally
+      e.preventDefault(); open(card, true);
+    });
+    card.addEventListener("keydown", function (e) { if ((e.key === "Enter" || e.key === " ") && e.target === card) { e.preventDefault(); open(card, true); } });
+  });
+  wrap.querySelector(".pshade").addEventListener("click", function () { close(false); });
+  wrap.querySelector(".pclose").addEventListener("click", function () { close(false); });
+  document.addEventListener("keydown", function (e) { if (e.key === "Escape") close(false); });
+  window.addEventListener("popstate", function () {
+    var id = location.hash.slice(1), card = id && document.getElementById(id);
+    if (card && card.hasAttribute("data-panel")) open(card, false); else close(true);
+  });
+  // a shared link to one startup (#r-123) opens its panel
+  var id0 = location.hash.slice(1), c0 = id0 && document.getElementById(id0);
+  if (c0 && c0.hasAttribute("data-panel")) { c0.scrollIntoView({ block: "center" }); open(c0, false); }
 })();

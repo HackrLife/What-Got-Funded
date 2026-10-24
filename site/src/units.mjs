@@ -95,6 +95,36 @@ export function startupUnit(r, { href = r.href, day = r.announced_on, heading = 
 </article>`;
 }
 
+// The compact card: the key facts at a glance. Clicking it opens the full unit in the side panel (app.js);
+// the full unit travels inside the card as a <template>, so the panel needs no extra request.
+const dayMonth = (iso) => new Date(iso + "T12:00:00Z").toLocaleDateString("en-GB", { day: "numeric", month: "short", timeZone: "UTC" });
+export function startupCard(r, opts = {}) {
+  const { href = r.href, day = r.announced_on } = opts;
+  const c = contOf(r.cont);
+  const founders = cleanFounders(r.founders || []);
+  const leads = cleanInvestors(r.leads || []);
+  const others = cleanInvestors(r.investors || []).filter((n) => !leads.includes(n));
+  const amount = usd(r.amount_usd);
+  const backers = leads.length ? leads : others;
+  const backLabel = leads.length ? "Led by" : "Investors";
+  const more = (list, n) => list.length > n ? ` +${list.length - n}` : "";
+  const coLinks = [icon("web", r.domain && `https://${r.domain}`, "Website"), icon("li", r.linkedin_url, "Company LinkedIn"), icon("x", r.x_url, "Company X")].join("");
+  const full = startupUnit(r, { ...opts, heading: "h2" }).replace(` id="r-${r.id}"`, "");
+  return `<article class="card" id="r-${r.id}" data-c="${r.cont}" data-panel style="--c:${c.color}">
+  <div class="c-top"><span class="c-where"><i class="dot"></i>${esc(r.country || "Not stated")}</span><span>${esc(dayMonth(day))}</span></div>
+  <h3 class="c-name">${href ? `<a href="${href}">${esc(r.company)}</a>` : esc(r.company)}</h3>
+  <div class="c-money"><b${amount ? "" : ' class="na"'}>${esc(amount || "Undisclosed")}</b><span>${esc(STAGE[r.stage] || "Stage not stated")}</span></div>
+  ${r.description ? `<p class="c-what">${esc(r.description)}</p>` : ""}
+  <dl class="c-facts">
+    <div><dt>Industry</dt><dd>${esc(r.sector || "Not stated")}</dd></div>
+    <div><dt>${backLabel}</dt><dd>${backers.length ? esc(backers[0]) + more(backers, 1) : "Not disclosed"}</dd></div>
+    <div><dt>Founders</dt><dd>${founders.length ? esc(founders.slice(0, 2).map((f) => f.name).join(", ")) + more(founders, 2) : "Not named yet"}</dd></div>
+  </dl>
+  <div class="c-foot"><span class="icons">${coLinks}</span><button type="button" class="c-open">Details<span aria-hidden="true"> →</span></button></div>
+  <template class="full">${full}</template>
+</article>`;
+}
+
 // The list of startups with region chips, a CSV link and progressive loading (app.js reveals 12 at a time).
 export function startupList(rows, { title = "Every startup", csv = null, day = null } = {}) {
   const sorted = [...rows].sort((a, b) => (b.amount_usd || 0) - (a.amount_usd || 0) || a.company.localeCompare(b.company));
@@ -103,8 +133,8 @@ export function startupList(rows, { title = "Every startup", csv = null, day = n
   return `<section class="block list" id="startups">
   <div class="h2row"><h2>${esc(title)}</h2>${csv ? `<a class="csv" href="${csv}" download>${ICON_DL}Download CSV</a>` : ""}</div>
   <div class="chips" role="toolbar" aria-label="Filter by region">${chips}</div>
-  <div class="units" data-page="12">
-${sorted.map((r) => startupUnit(r, { day: day || r.announced_on })).join("\n")}
+  <div class="cards" data-page="12">
+${sorted.map((r) => startupCard(r, { day: day || r.announced_on })).join("\n")}
   </div>
   <div class="more-wrap"><button type="button" class="more-btn" hidden>Show more startups</button></div>
 </section>`;

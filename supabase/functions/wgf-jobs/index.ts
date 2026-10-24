@@ -136,6 +136,7 @@ const FUNC: [string, RegExp][] = [
 const funcOf = (t: string) => (FUNC.find(([, re]) => re.test(t)) ?? ["other"])[0];
 function seniorityOf(t: string) {
   t = t.replace(/member of (the )?technical staff/ig, "");   // a title, not a level
+  if (/\bchief of staff\b/i.test(t)) return "lead";
   if (/\b(chief|cto|cfo|coo|cmo|cpo|cro|ceo)\b/i.test(t)) return "c_level";
   if (/\b(vp|vice president|svp|evp)\b/i.test(t)) return "vp";
   if (/\bhead of\b|\bhead,|general manager|country manager|managing director/i.test(t)) return "head";

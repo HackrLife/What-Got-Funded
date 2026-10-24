@@ -398,12 +398,24 @@ function jobsPage(allJobs, published, today, hrefOf, hiringAll = []) {
     <a class="apply" href="${esc(j.url)}" rel="noopener nofollow" target="_blank">Apply</a></li>`;
   const coCard = (g) => {
     const j0 = g.j0, c = contOf(continentOf(j0.hq_country ? countryLabel(j0.hq_country) : null));
-    const raised = [usd(j0.amount_usd), STAGE[j0.stage] && STAGE[j0.stage] !== "Not stated" ? STAGE[j0.stage] : "", `announced ${shortDate(j0.announced_on)}`].filter(Boolean).join(" · ");
-    return `<article class="hco" data-tab="${g.tab}" style="--c:${c.color}">
-  <header><div><h3><a href="${hrefOf(j0.company_id) || (j0.domain ? `https://${j0.domain}` : "#")}">${esc(j0.company)}</a></h3><div class="hraised">Raised ${esc(raised)}${j0.hq_country ? ` · ${esc(countryLabel(j0.hq_country))}` : ""}</div></div>
-    <div class="hcount"><b>${g.rows.length}</b><span>key ${g.rows.length === 1 ? "role" : "roles"}</span></div></header>
+    const raised = [usd(j0.amount_usd), STAGE[j0.stage] && STAGE[j0.stage] !== "Not stated" ? STAGE[j0.stage] : ""].filter(Boolean).join(" · ");
+    const coHref = hrefOf(j0.company_id) || (j0.domain ? `https://${j0.domain}` : "#");
+    const n = g.rows.length;
+    const full = `<article class="hco pfull" style="--c:${c.color}">
+  <header><div><h2><a href="${coHref}">${esc(j0.company)}</a></h2><div class="hraised">Raised ${esc([raised, `announced ${shortDate(j0.announced_on)}`].filter(Boolean).join(" · "))}${j0.hq_country ? ` · ${esc(countryLabel(j0.hq_country))}` : ""}</div></div>
+    <div class="hcount"><b>${n}</b><span>key ${n === 1 ? "role" : "roles"}</span></div></header>
   ${j0.use_of_funds ? `<p class="why"><b>Why they're hiring</b>${esc(j0.use_of_funds)}</p>` : ""}
   <ul class="roles">${g.rows.map((j) => roleRow(j)).join("")}</ul>
+</article>`;
+    const mini = (j) => `<li class="role" data-fn="${j.function}" data-tags="${[j.founding && "founding", j.remote && "remote", j.fractional && "fractional"].filter(Boolean).join(" ")}"><a href="${esc(j.url)}" rel="noopener nofollow" target="_blank">${esc(j.title)}</a><span class="rmeta">${tags(j).map(chip).join("")}</span></li>`;
+    return `<article class="card jcard" id="co-${j0.company_id}" data-tab="${g.tab}" data-panel style="--c:${c.color}">
+  <div class="c-top"><span class="c-where">${j0.hq_country ? `<i class="dot"></i>${esc(countryLabel(j0.hq_country))}` : ""}</span><span>Raised ${esc(shortDate(j0.announced_on))}</span></div>
+  <h3 class="c-name"><a href="${coHref}">${esc(j0.company)}</a></h3>
+  <div class="c-money"><b>${n}</b><span>key ${n === 1 ? "role" : "roles"}${raised ? ` · raised ${esc(raised)}` : ""}</span></div>
+  <ul class="roles mini">${g.rows.map(mini).join("")}</ul>
+  <p class="c-more" hidden></p>
+  <div class="c-foot"><span></span><button type="button" class="c-open">All roles<span aria-hidden="true"> →</span></button></div>
+  <template class="full">${full}</template>
 </article>`;
   };
   // Hiring signal: just-funded startups that said the money pays for hiring but have no key roles posted yet
@@ -411,15 +423,25 @@ function jobsPage(allJobs, published, today, hrefOf, hiringAll = []) {
   const hiring = hiringAll.filter((h) => !shown.has(h.company_id) && since(h.announced_on, 45)).sort((a, b) => (b.announced_on || "").localeCompare(a.announced_on || "") || (b.amount_usd || 0) - (a.amount_usd || 0));
   const sigCard = (h) => {
     const c = contOf(continentOf(h.hq_country ? countryLabel(h.hq_country) : null));
-    const raised = [usd(h.amount_usd), STAGE[h.stage] && STAGE[h.stage] !== "Not stated" ? STAGE[h.stage] : "", `announced ${shortDate(h.announced_on)}`].filter(Boolean).join(" · ");
+    const raised = [usd(h.amount_usd), STAGE[h.stage] && STAGE[h.stage] !== "Not stated" ? STAGE[h.stage] : ""].filter(Boolean).join(" · ");
     const site = h.careers_url || (h.domain ? `https://${h.domain}` : null);
-    return `<article class="hco hsig" style="--c:${c.color}">
-  <header><div><h3><a href="${hrefOf(h.company_id) || site || "#"}">${esc(h.company)}</a></h3><div class="hraised">Raised ${esc(raised)}${h.hq_country ? ` · ${esc(countryLabel(h.hq_country))}` : ""}</div></div></header>
+    const coHref = hrefOf(h.company_id) || site || "#";
+    const links = `${h.source_url ? `<a href="${esc(h.source_url)}" rel="noopener nofollow" target="_blank">Read the announcement</a>` : ""}${site ? `<a href="${esc(site)}" rel="noopener nofollow" target="_blank">${h.careers_url ? "Careers page" : "Company website"}</a>` : ""}${h.linkedin_url ? `<a href="${esc(h.linkedin_url)}" rel="noopener nofollow" target="_blank">LinkedIn</a>` : ""}`;
+    const full = `<article class="hco hsig pfull" style="--c:${c.color}">
+  <header><div><h2><a href="${coHref}">${esc(h.company)}</a></h2><div class="hraised">Raised ${esc([raised, `announced ${shortDate(h.announced_on)}`].filter(Boolean).join(" · "))}${h.hq_country ? ` · ${esc(countryLabel(h.hq_country))}` : ""}</div></div></header>
   <p class="why"><b>What the money is for</b>${esc(h.use_of_funds)}</p>
-  <div class="sigacts">${h.source_url ? `<a href="${esc(h.source_url)}" rel="noopener nofollow" target="_blank">Read the announcement</a>` : ""}${site ? `<a href="${esc(site)}" rel="noopener nofollow" target="_blank">${h.careers_url ? "Careers page" : "Company website"}</a>` : ""}${h.linkedin_url ? `<a href="${esc(h.linkedin_url)}" rel="noopener nofollow" target="_blank">LinkedIn</a>` : ""}</div>
+  <div class="sigacts">${links}</div>
+</article>`;
+    return `<article class="card scard" id="sig-${h.company_id}" data-panel style="--c:${c.color}">
+  <div class="c-top"><span class="c-where">${h.hq_country ? `<i class="dot"></i>${esc(countryLabel(h.hq_country))}` : ""}</span><span>${esc(shortDate(h.announced_on))}</span></div>
+  <h3 class="c-name"><a href="${coHref}">${esc(h.company)}</a></h3>
+  <div class="c-money"><b${h.amount_usd ? "" : ' class="na"'}>${esc(usd(h.amount_usd) || "Undisclosed")}</b><span>${esc(STAGE[h.stage] && STAGE[h.stage] !== "Not stated" ? STAGE[h.stage] : "")}</span></div>
+  <p class="c-what"><b>What the money is for</b>${esc(h.use_of_funds)}</p>
+  <div class="c-foot"><span></span><button type="button" class="c-open">Details<span aria-hidden="true"> →</span></button></div>
+  <template class="full">${full}</template>
 </article>`;
   };
-  const sigBlock = hiring.length ? `<section class="block" id="signals"><h2>Hiring, no roles posted yet</h2><p class="sub2">Startups funded in the last 45 days whose announcement says the money pays for hiring. Their roles are not on a public job board yet, so the way in is the company itself.</p><div class="hcos sigs">${hiring.map(sigCard).join("\n")}</div></section>` : "";
+  const sigBlock = hiring.length ? `<section class="block" id="signals"><h2>Hiring, no roles posted yet</h2><p class="sub2">Startups funded in the last 45 days whose announcement says the money pays for hiring. Their roles are not on a public job board yet, so the way in is the company itself.</p><div class="cards sigs">${hiring.map(sigCard).join("\n")}</div></section>` : "";
   const fnCounts = new Map(); for (const j of all) fnCounts.set(j.function, (fnCounts.get(j.function) || 0) + 1);
   const fnChips = [`<button type="button" class="on" data-fn="all">All functions</button>`, ...Object.keys(FN_LABEL).filter((k) => fnCounts.get(k)).map((k) => `<button type="button" data-fn="${k}">${FN_LABEL[k]} ${fnCounts.get(k)}</button>`)].join("");
   const nFresh = groups.filter((g) => g.tab === "fresh").length, nHot = groups.filter((g) => g.tab === "hot").length;
@@ -437,7 +459,7 @@ ${all.length ? `
   <div class="tabs" role="tablist"><button type="button" class="on" data-tab="fresh">Just funded <small>${nFresh}</small></button><button type="button" data-tab="hot">Hot startups <small>${nHot}</small></button></div>
   <div class="chips fnchips">${fnChips}</div>
   <div class="toggles"><label><input type="checkbox" value="founding">Founding</label><label><input type="checkbox" value="remote">Remote</label><label><input type="checkbox" value="fractional">Fractional</label></div>
-  <div class="hcos">${groups.map(coCard).join("\n")}</div>
+  <div class="cards hcos">${groups.map(coCard).join("\n")}</div>
   <p class="jnone" hidden>No roles match these filters.</p>
 </section>` : empty}
 ${sigBlock}
