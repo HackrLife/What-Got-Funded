@@ -836,3 +836,51 @@ body.has-sel { padding-bottom: 90px; }
 .psub-done { border: 0; background: none; padding: 6px 0 0; font: inherit; font-size: 12.5px; color: var(--muted); text-decoration: underline; cursor: pointer; }
 @media (max-width: 700px) { .psub { padding: 12px 44px 10px 16px; } .psub p { font-size: 14px; } }
 .psub[hidden] { display: block !important; position: absolute; left: -9999px; width: 600px; visibility: hidden; }
+/* about: problem, solution, audience, delivery */
+.about2 .hero2 h1 { max-width: 18ch; }
+.abcards { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 18px; margin-top: 22px; }
+.abcards article { background: #fff; border: 1px solid var(--line); border-radius: 16px; padding: 24px 24px 22px; }
+.abn { display: inline-block; font-size: 12.5px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+.abcards h3, .abwho h3, .abdeliver h3 { font-size: 20px; font-weight: 800; margin-top: 8px; line-height: 1.25; }
+.abcards p, .abwho p, .abdeliver p { margin-top: 8px; font-size: 15.5px; line-height: 1.55; color: #2c3647; }
+.abwho { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 18px; margin-top: 22px; }
+.abwho article { border-top: 4px solid var(--ink); padding-top: 14px; }
+.abwho article:nth-child(6n+1) { border-color: #f9a825; } .abwho article:nth-child(6n+2) { border-color: #00897b; } .abwho article:nth-child(6n+3) { border-color: #3d5afe; }
+.abwho article:nth-child(6n+4) { border-color: #e53935; } .abwho article:nth-child(6n+5) { border-color: #8e24aa; } .abwho article:nth-child(6n+6) { border-color: #172033; }
+.abdeliver { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 14px; margin-top: 22px; }
+.abd { display: flex; flex-direction: column; background: #fff; border: 1px solid var(--line); border-radius: 14px; padding: 18px 18px 16px; color: var(--ink); transition: box-shadow .15s; }
+.abd:hover { box-shadow: 0 6px 24px rgba(23, 32, 51, .10); }
+.abd h3 { margin-top: 0; font-size: 18px; }
+.abd p { font-size: 14.5px; flex: 1; }
+.abd span { margin-top: 12px; color: var(--link); font-weight: 700; font-size: 14.5px; }
+.about2 .kpis2 { margin: 18px 0 4px; }
+/* jobs: one card per role */
+.rolecard .c-name { font-size: 19px; }
+.c-co { margin-top: 8px; font-size: 14.5px; color: var(--muted); } .c-co b { color: var(--ink); }
+.rolecard .jtags { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 10px; }
+.c-loc { margin-top: 10px; font-size: 14px; color: var(--muted); }
+.rolecard .apply { border: 1px solid var(--ink); border-radius: 999px; padding: 7px 14px; font-weight: 700; font-size: 14px; color: var(--ink); }
+.rolecard .apply:hover { background: var(--ink); color: #fff; }
+.rolecard[hidden] { display: none; }
+.jfull { padding: 22px 4px 8px; border-top: 5px solid var(--c); }
+.jfull .jk { font-size: 13.5px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; }
+.jfull h2 { font-size: 28px; font-weight: 800; line-height: 1.15; margin-top: 6px; }
+.jfull .jtags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; }
+.japply { display: inline-flex; margin-top: 18px; padding: 13px 22px; font-size: 16px; }
+.jfacts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px 20px; margin: 22px 0 0; padding-top: 18px; border-top: 1px solid var(--mist); }
+.jfacts dt { font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); font-weight: 700; }
+.jfacts dd { margin: 4px 0 0; font-size: 15.5px; }
+.jco, .jother { margin-top: 22px; padding-top: 18px; border-top: 1px solid var(--mist); }
+.jco h3, .jother h3 { font-size: 17px; font-weight: 800; }
+.jraise { margin-top: 6px; color: #2c3647; }
+.jco .why { margin-top: 12px; background: var(--bg2); border-radius: 10px; padding: 12px 16px; font-size: 15px; line-height: 1.5; }
+.jco .why b { display: block; font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin-bottom: 4px; }
+.jlinks { display: flex; flex-wrap: wrap; gap: 8px 18px; margin-top: 12px; font-weight: 650; font-size: 14.5px; }
+.jlinks a { color: var(--link); }
+.jother ul { list-style: none; padding: 0; margin-top: 8px; }
+.jother li { display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: center; padding: 9px 0; border-bottom: 1px solid var(--mist); }
+.jother li a { font-weight: 650; color: var(--ink); }
+.jvia { margin-top: 16px; color: var(--muted); font-size: 13.5px; }
+@media (max-width: 1100px) { .abdeliver { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+@media (max-width: 900px) { .abcards, .abwho { grid-template-columns: minmax(0, 1fr); } .abdeliver { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 560px) { .abdeliver { grid-template-columns: minmax(0, 1fr); } .jfacts { grid-template-columns: minmax(0, 1fr); } }

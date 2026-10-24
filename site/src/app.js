@@ -140,34 +140,30 @@
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", ready); else ready();
 })();
 
-// ---------- jobs board: tabs, function chips, founding/remote/fractional toggles ----------
+// ---------- jobs board: tabs, function chips, founding/remote/fractional toggles over role cards (24 at a time) ----------
 (function () {
   "use strict";
   var board = document.getElementById("board"); if (!board) return;
-  var tab = "fresh", fn = "all";
+  var tab = "fresh", fn = "all", page = 24, shown = page;
   var tabs = [].slice.call(board.querySelectorAll(".tabs button")), chips = [].slice.call(board.querySelectorAll(".fnchips button"));
-  var toggles = [].slice.call(board.querySelectorAll(".toggles input")), cos = [].slice.call(board.querySelectorAll(".jcard"));
-  var none = board.querySelector(".jnone");
+  var toggles = [].slice.call(board.querySelectorAll(".toggles input")), cards = [].slice.call(board.querySelectorAll(".rolecard"));
+  var none = board.querySelector(".jnone"), more = board.querySelector(".jmore");
   function render() {
-    var want = toggles.filter(function (t) { return t.checked; }).map(function (t) { return t.value; }), shown = 0;
-    cos.forEach(function (co) {
-      var n = 0;
-      if (co.getAttribute("data-tab") === tab) {
-        [].slice.call(co.querySelectorAll(".role")).forEach(function (r) {
-          var tags = (r.getAttribute("data-tags") || "").split(" ");
-          var ok = (fn === "all" || r.getAttribute("data-fn") === fn) && want.every(function (w) { return tags.indexOf(w) >= 0; });
-          r.hidden = !ok || n >= 3; if (ok) n++;   // the card shows the first three matching roles
-        });
-      }
-      var more = co.querySelector(".c-more");
-      if (more) { more.hidden = n <= 3; more.textContent = "+ " + (n - 3) + " more " + (n - 3 === 1 ? "role" : "roles"); }
-      co.hidden = n === 0; shown += n;
+    var want = toggles.filter(function (t) { return t.checked; }).map(function (t) { return t.value; }), n = 0, total = 0;
+    cards.forEach(function (c) {
+      var tags = (c.getAttribute("data-tags") || "").split(" ");
+      var ok = c.getAttribute("data-tab") === tab && (fn === "all" || c.getAttribute("data-fn") === fn) && want.every(function (w) { return tags.indexOf(w) >= 0; });
+      if (ok) total++;
+      c.hidden = !(ok && n < shown); if (ok && n < shown) n++;
     });
-    if (none) none.hidden = shown > 0;
+    if (none) none.hidden = total > 0;
+    if (more) { more.hidden = n >= total; more.textContent = "Show more roles (" + (total - n) + " more)"; }
   }
-  tabs.forEach(function (b) { b.addEventListener("click", function () { tab = b.getAttribute("data-tab"); tabs.forEach(function (x) { x.classList.toggle("on", x === b); }); render(); }); });
-  chips.forEach(function (b) { b.addEventListener("click", function () { fn = b.getAttribute("data-fn"); chips.forEach(function (x) { x.classList.toggle("on", x === b); }); render(); }); });
-  toggles.forEach(function (t) { t.addEventListener("change", render); });
+  function reset() { shown = page; render(); }
+  tabs.forEach(function (b) { b.addEventListener("click", function () { tab = b.getAttribute("data-tab"); tabs.forEach(function (x) { x.classList.toggle("on", x === b); }); reset(); }); });
+  chips.forEach(function (b) { b.addEventListener("click", function () { fn = b.getAttribute("data-fn"); chips.forEach(function (x) { x.classList.toggle("on", x === b); }); reset(); }); });
+  toggles.forEach(function (t) { t.addEventListener("change", reset); });
+  if (more) more.addEventListener("click", function () { shown += page; render(); });
   render();
 })();
 
@@ -186,7 +182,7 @@
     var t = card.querySelector("template.full"); if (!t) return;
     body.innerHTML = ""; body.appendChild(t.content.cloneNode(true));
     var link = card.querySelector(".c-name a");
-    var href = link && link.getAttribute("href");
+    var href = card.getAttribute("data-href") || (link && link.getAttribute("href"));
     full.hidden = !href || href === "#" || /^https?:/.test(href); if (!full.hidden) full.href = href;
     last = card; openId = card.id;
     wrap.hidden = false; document.documentElement.classList.add("pnl-open");
@@ -231,7 +227,7 @@
     box.hidden = true;
     if (opens < 2 || store.get("wgf-subscribed") || Date.now() < (Number(store.get("wgf-sub-hide")) || 0)) return;
     var nameEl = card.querySelector(".c-name"); var name = nameEl ? nameEl.textContent.trim() : "";
-    var jobs = card.classList.contains("jcard") || card.classList.contains("scard");
+    var jobs = card.classList.contains("rolecard") || card.classList.contains("jcard") || card.classList.contains("scard");
     boxText.textContent = "";
     if (jobs) { boxText.appendChild(document.createTextNode("Get the top founding and leadership roles at newly funded startups in your inbox every day. ")); var f = document.createElement("b"); f.textContent = "Free."; boxText.appendChild(f); }
     else { boxText.appendChild(document.createTextNode("Get startups like ")); var b = document.createElement("b"); b.textContent = name || "this one"; boxText.appendChild(b); boxText.appendChild(document.createTextNode(" in your inbox every day. Free.")); }

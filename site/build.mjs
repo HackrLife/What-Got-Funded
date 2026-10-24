@@ -392,32 +392,43 @@ function jobsPage(allJobs, published, today, hrefOf, hiringAll = []) {
     return { j0, rows: rows.sort((a, b) => b.score - a.score), tab: fresh ? "fresh" : hot ? "hot" : null };
   }).filter((g) => g.tab && g.rows.length).sort((a, b) => (b.rows[0].score || 0) - (a.rows[0].score || 0));
   const all = groups.flatMap((g) => g.rows.map((j) => ({ ...j, tab: g.tab })));
-  const keyToday = all.filter((j) => j.tab === "fresh").sort((a, b) => b.score - a.score).slice(0, 15);
   const tags = (j) => [j.founding && "Founding", SEN_LABEL[j.seniority], j.remote && "Remote", j.fractional && "Fractional"].filter(Boolean);
   const chip = (t) => `<span class="jtag t-${slugify(t)}">${esc(t)}</span>`;
   const roleRow = (j, withCo = false) => `<li class="role" data-fn="${j.function}" data-tags="${[j.founding && "founding", j.remote && "remote", j.fractional && "fractional"].filter(Boolean).join(" ")}" data-tab="${j.tab}">
     <div class="rt"><a class="rtitle" href="${esc(j.url)}" rel="noopener nofollow" target="_blank">${esc(j.title)}</a>${withCo ? `<span class="rco">at <a href="${hrefOf(j.company_id) || (j.domain ? `https://${j.domain}` : "#")}">${esc(j.company)}</a></span>` : ""}
       <div class="rmeta">${tags(j).map(chip).join("")}<span>${esc(FN_LABEL[j.function] || "")}</span>${j.location ? `<span>${esc(j.location)}</span>` : ""}${j.posted_on ? `<span>Posted ${esc(shortDate(j.posted_on))}</span>` : ""}${j.via ? `<span class="via">via ${esc(j.via)}</span>` : ""}</div></div>
     <a class="apply" href="${esc(j.url)}" rel="noopener nofollow" target="_blank">Apply</a></li>`;
-  const coCard = (g) => {
-    const j0 = g.j0, c = contOf(continentOf(j0.hq_country ? countryLabel(j0.hq_country) : null));
-    const raised = [usd(j0.amount_usd), STAGE[j0.stage] && STAGE[j0.stage] !== "Not stated" ? STAGE[j0.stage] : ""].filter(Boolean).join(" · ");
-    const coHref = hrefOf(j0.company_id) || (j0.domain ? `https://${j0.domain}` : "#");
-    const n = g.rows.length;
-    const full = `<article class="hco pfull" style="--c:${c.color}">
-  <header><div><h2><a href="${coHref}">${esc(j0.company)}</a></h2><div class="hraised">Raised ${esc([raised, `announced ${shortDate(j0.announced_on)}`].filter(Boolean).join(" · "))}${j0.hq_country ? ` · ${esc(countryLabel(j0.hq_country))}` : ""}</div></div>
-    <div class="hcount"><b>${n}</b><span>key ${n === 1 ? "role" : "roles"}</span></div></header>
-  ${j0.use_of_funds ? `<p class="why"><b>Why they're hiring</b>${esc(j0.use_of_funds)}</p>` : ""}
-  <ul class="roles">${g.rows.map((j) => roleRow(j)).join("")}</ul>
+  // One card per role. The panel carries the role's details, the Apply button, the company's raise and its other open roles.
+  const empType = (t) => { const x = String(t || "").replace(/([a-z])([A-Z])/g, "$1 $2").replace(/[_-]+/g, " ").trim().toLowerCase().replace(/^(full|part) time/, "$1-time"); return x ? x.charAt(0).toUpperCase() + x.slice(1) : "Not stated"; };
+  const byCompany = new Map(); for (const j of all) { if (!byCompany.has(j.company_id)) byCompany.set(j.company_id, []); byCompany.get(j.company_id).push(j); }
+  const roleCard = (j) => {
+    const c = contOf(continentOf(j.hq_country ? countryLabel(j.hq_country) : null));
+    const raised = [usd(j.amount_usd), STAGE[j.stage] && STAGE[j.stage] !== "Not stated" ? STAGE[j.stage] : ""].filter(Boolean).join(" ");
+    const coHref = hrefOf(j.company_id) || (j.domain ? `https://${j.domain}` : null);
+    const others = (byCompany.get(j.company_id) || []).filter((x) => x.id !== j.id);
+    const facts = [["Company", j.company], ["Function", FN_LABEL[j.function] || "Other"], ["Level", SEN_LABEL[j.seniority] || "Individual contributor"],
+      ["Location", j.location || (j.remote ? "Remote" : "Not stated")], ["Type", empType(j.employment_type)], ["Posted", j.posted_on ? shortDate(j.posted_on) : "Not stated"]];
+    const full = `<article class="jfull pfull" style="--c:${c.color}">
+  <p class="jk">${esc(j.company)}${j.hq_country ? ` · ${esc(countryLabel(j.hq_country))}` : ""}</p>
+  <h2>${esc(j.title)}</h2>
+  <div class="jtags">${tags(j).map(chip).join("")}</div>
+  <a class="btn2 dark japply" href="${esc(j.url)}" rel="noopener nofollow" target="_blank">Apply on ${esc(j.via || j.company)}<span aria-hidden="true"> ↗</span></a>
+  <dl class="jfacts">${facts.map(([k, v]) => `<div><dt>${k}</dt><dd>${esc(v)}</dd></div>`).join("")}</dl>
+  <section class="jco"><h3>About ${esc(j.company)}</h3>
+    <p class="jraise">Raised ${esc(raised || "an undisclosed amount")}, announced ${esc(shortDate(j.announced_on))}.</p>
+    ${j.use_of_funds ? `<p class="why"><b>Why they're hiring</b>${esc(j.use_of_funds)}</p>` : ""}
+    <p class="jlinks">${coHref && coHref.startsWith("/") ? `<a href="${coHref}">Company profile and funding</a>` : ""}${j.domain ? `<a href="https://${esc(j.domain)}" rel="noopener nofollow" target="_blank">${esc(j.domain)}</a>` : ""}${j.linkedin_url ? `<a href="${esc(j.linkedin_url)}" rel="noopener nofollow" target="_blank">LinkedIn</a>` : ""}</p>
+  </section>
+  ${others.length ? `<section class="jother"><h3>Other key roles at ${esc(j.company)}</h3><ul>${others.slice(0, 8).map((o) => `<li><a href="${esc(o.url)}" rel="noopener nofollow" target="_blank">${esc(o.title)}</a><span>${tags(o).map(chip).join("")}</span></li>`).join("")}</ul></section>` : ""}
+  ${j.via ? `<p class="jvia">Listed via ${esc(j.via)}.</p>` : ""}
 </article>`;
-    const mini = (j) => `<li class="role" data-fn="${j.function}" data-tags="${[j.founding && "founding", j.remote && "remote", j.fractional && "fractional"].filter(Boolean).join(" ")}"><a href="${esc(j.url)}" rel="noopener nofollow" target="_blank">${esc(j.title)}</a><span class="rmeta">${tags(j).map(chip).join("")}</span></li>`;
-    return `<article class="card jcard" id="co-${j0.company_id}" data-tab="${g.tab}" data-panel style="--c:${c.color}">
-  <div class="c-top"><span class="c-where">${j0.hq_country ? `<i class="dot"></i>${esc(countryLabel(j0.hq_country))}` : ""}</span><span>Raised ${esc(shortDate(j0.announced_on))}</span></div>
-  <h3 class="c-name"><a href="${coHref}">${esc(j0.company)}</a></h3>
-  <div class="c-money"><b>${n}</b><span>key ${n === 1 ? "role" : "roles"}${raised ? ` · raised ${esc(raised)}` : ""}</span></div>
-  <ul class="roles mini">${g.rows.map(mini).join("")}</ul>
-  <p class="c-more" hidden></p>
-  <div class="c-foot"><span></span><button type="button" class="c-open">All roles<span aria-hidden="true"> →</span></button></div>
+    return `<article class="card rolecard" id="job-${j.id}" data-tab="${j.tab}" data-fn="${j.function}" data-tags="${[j.founding && "founding", j.remote && "remote", j.fractional && "fractional"].filter(Boolean).join(" ")}" data-panel tabindex="0"${coHref && coHref.startsWith("/") ? ` data-href="${coHref}"` : ""} style="--c:${c.color}">
+  <div class="c-top"><span class="c-where">${j.hq_country ? `<i class="dot"></i>${esc(countryLabel(j.hq_country))}` : ""}</span><span>${j.posted_on ? `Posted ${esc(shortDate(j.posted_on))}` : ""}</span></div>
+  <h3 class="c-name">${esc(j.title)}</h3>
+  <p class="c-co"><b>${esc(j.company)}</b>${raised ? ` · raised ${esc(raised)}` : ""}</p>
+  <div class="jtags">${tags(j).map(chip).join("")}</div>
+  <p class="c-loc">${esc([FN_LABEL[j.function], j.location].filter(Boolean).join(" · "))}</p>
+  <div class="c-foot"><a class="apply" href="${esc(j.url)}" rel="noopener nofollow" target="_blank">Apply<span aria-hidden="true"> ↗</span></a><button type="button" class="c-open">Details<span aria-hidden="true"> →</span></button></div>
   <template class="full">${full}</template>
 </article>`;
   };
@@ -447,23 +458,25 @@ function jobsPage(allJobs, published, today, hrefOf, hiringAll = []) {
   const sigBlock = hiring.length ? `<section class="block" id="signals"><h2>Hiring, no roles posted yet</h2><p class="sub2">Startups funded in the last 45 days whose announcement says the money pays for hiring. Their roles are not on a public job board yet, so the way in is the company itself.</p><div class="cards sigs">${hiring.map(sigCard).join("\n")}</div></section>` : "";
   const fnCounts = new Map(); for (const j of all) fnCounts.set(j.function, (fnCounts.get(j.function) || 0) + 1);
   const fnChips = [`<button type="button" class="on" data-fn="all">All functions</button>`, ...Object.keys(FN_LABEL).filter((k) => fnCounts.get(k)).map((k) => `<button type="button" data-fn="${k}">${FN_LABEL[k]} ${fnCounts.get(k)}</button>`)].join("");
-  const nFresh = groups.filter((g) => g.tab === "fresh").length, nHot = groups.filter((g) => g.tab === "hot").length;
+  const nFresh = all.filter((j) => j.tab === "fresh").length, nHot = all.filter((j) => j.tab === "hot").length;
+  const nFreshCos = groups.filter((g) => g.tab === "fresh").length;
+  const sortedRoles = [...all].sort((a, b) => (b.score || 0) - (a.score || 0));
   const empty = `<div class="jempty"><h3>Roles are being collected</h3><p>Every night we collect the open roles of every startup that raised in the last year, from job boards, careers pages and remote job feeds, and keep only the roles that shape a company: founding hires, leaders, and remote or fractional roles.</p></div>`;
   const body = `<div class="wrap jobs2">
 <section class="hero2"><p class="kick">Jobs</p>
   <h1>The first hires at startups that just raised.</h1>
   <p class="lede">Founding, leadership, remote and fractional roles at startups funded in the last 30 days, and at the year's hottest startups. Every role links straight to the company's own posting, and startups that raised to hire but have not posted roles yet are listed too.</p>
-  <div class="stats"><div><span class="sv">${all.length}</span><span class="sl">key roles open</span></div><div><span class="sv">${nFresh}</span><span class="sl">just-funded startups hiring</span></div><div><span class="sv">${all.filter((j) => j.founding).length}</span><span class="sl">founding roles</span></div><div><span class="sv">${hiring.length}</span><span class="sl">hiring, no roles posted yet</span></div></div>
+  <div class="stats"><div><span class="sv">${all.length}</span><span class="sl">key roles open</span></div><div><span class="sv">${nFreshCos}</span><span class="sl">just-funded startups hiring</span></div><div><span class="sv">${all.filter((j) => j.founding).length}</span><span class="sl">founding roles</span></div><div><span class="sv">${hiring.length}</span><span class="sl">hiring, no roles posted yet</span></div></div>
   <div class="acts"><a class="btn2" href="/data/jobs.csv" download>${ICON_DL}Download roles as CSV</a></div>
 </section>
 ${all.length ? `
-<section class="block"><h2>Key roles today</h2><p class="sub2">The founding and leadership roles that just-funded startups opened most recently.</p><ul class="roles keyroles">${keyToday.map((j) => roleRow(j, true)).join("")}</ul></section>
 <section class="block jlist" id="board">
-  <div class="tabs" role="tablist"><button type="button" class="on" data-tab="fresh">Just funded <small>${nFresh}</small></button><button type="button" data-tab="hot">Hot startups <small>${nHot}</small></button></div>
+  <div class="tabs" role="tablist"><button type="button" class="on" data-tab="fresh">Just funded <small>${nFresh} roles</small></button><button type="button" data-tab="hot">Hot startups <small>${nHot} roles</small></button></div>
   <div class="chips fnchips">${fnChips}</div>
   <div class="toggles"><label><input type="checkbox" value="founding">Founding</label><label><input type="checkbox" value="remote">Remote</label><label><input type="checkbox" value="fractional">Fractional</label></div>
-  <div class="cards hcos">${groups.map(coCard).join("\n")}</div>
+  <div class="cards roles-grid">${sortedRoles.map(roleCard).join("\n")}</div>
   <p class="jnone" hidden>No roles match these filters.</p>
+  <div class="more-wrap"><button type="button" class="more-btn jmore" hidden>Show more roles</button></div>
 </section>` : empty}
 ${sigBlock}
 </div>${joinBand()}`;
@@ -559,14 +572,44 @@ ${l.map((s) => `<tr><td><a class="u" href="${esc(s.homepage)}" rel="nofollow noo
   <div class="out"><b style="color:var(--ink)">What comes out:</b><span>Daily edition on the site</span><span>Daily newsletter</span><span>CSV of every round</span><span>Analysis</span></div>
 </div>`;
   const block = (k, c, h, inner, wide = false) => `<section class="pblock${wide ? " wide" : ""}" style="--c:${c}"><span class="pk"><i></i>${k}</span><h3>${h}</h3>${inner}</section>`;
+  const who = [
+    ["Account executives", "Reach a startup in the weeks after it raises, while the budget for new tools and services is being set."],
+    ["Sales development reps", "Start each day with a short, fresh list of funded companies, their founders and LinkedIn profiles, and a note ready to send."],
+    ["Inbound and marketing teams", "Spot newly funded companies already in your pipeline, and target ads and content at the sectors and markets raising money now."],
+    ["Agency owners", "Offer design, growth, recruiting or engineering help to startups that just raised and are about to spend on exactly that."],
+    ["Solopreneurs and freelancers", "Find the founders who now have budget for fractional help, and contact them before larger firms do."],
+    ["ISVs and software vendors", "Find funded startups in your target sectors and reach them while they are still choosing the tools they will build on."],
+  ];
+  const deliver = [
+    ["Daily email", "Every startup that raised yesterday, a short analysis, and the top jobs at those startups. Free, every day.", "/subscribe/", "Subscribe"],
+    ["Today", "The day's startups as cards, with filters, tick boxes and exports for a CSV, your CRM or LinkedIn notes.", "/", "Open today"],
+    ["Explore", "Every round since launch, searchable by country, city, stage, sector and investor.", "/explore/", "Explore"],
+    ["Jobs", "Founding, leadership, remote and fractional roles at the startups that just raised.", "/jobs/", "See jobs"],
+    ["Digests", "A weekly digest every Sunday, a monthly digest in the first week of each month, and a yearly review.", "/editions/", "Read editions"],
+  ];
   const body = `<div class="wrap about2">
 <section class="hero2"><p class="kick">About</p>
-  <h1>We find every startup funding round and show where the money is going.</h1>
-  <p class="lede">What Got Funded curates startup funding news from around the world, records each round in the same format, and analyses it by region, market, sector, stage and investor.</p>
-  <p>We are not a private database and we do not run our own investigations. Every round on this site was reported publicly, and every entry links to the reports it came from.</p>
-  <div class="kpis2"><div><b>${read.length}</b><span>news sources</span></div><div><b>${searches}</b><span>local-language searches</span></div><div><b>${markets}</b><span>markets</span></div><div><b>${langs.size}</b><span>languages</span></div></div>
+  <h1>Funding data you can act on the same day.</h1>
+  <p class="lede">Databases of funded startups list hundreds of thousands of companies. Almost nobody can contact that many. What Got Funded gives you the startups that raised yesterday, every day: dozens to a few hundred companies, each with its founders, investors and links, ready for you to reach out before anyone else does.</p>
+  <div class="acts"><a class="btn2 dark" href="/subscribe/">Get it every day, free</a><a class="btn2" href="/explore/">Explore the data</a></div>
 </section>
-<section class="block"><h2>How it works</h2><p class="sub2">Six agents run in one automated pipeline, every night.</p>${pipe}</section>
+<section class="block"><h2>The problem</h2><p class="sub2">Selling to startups is a timing problem. A company is most open to new tools, services and hires in the weeks after it raises, and that window closes fast.</p>
+<div class="abcards">
+  <article><span class="abn">01</span><h3>Too big to use</h3><p>Funding databases hold hundreds of thousands of companies. A list that size cannot be worked by one rep, one agency or one founder, so most of it is never contacted.</p></article>
+  <article><span class="abn">02</span><h3>Too late to matter</h3><p>Monthly reports and quarterly lists arrive after the budget has been set and the first vendors have been chosen.</p></article>
+  <article><span class="abn">03</span><h3>Too thin to act on</h3><p>A company name and an amount are not enough. You need the founders, where to find them, who invested and what the money is for.</p></article>
+</div></section>
+<section class="block"><h2>The solution</h2><p class="sub2">One day's funding at a time. Small enough to work through, fresh enough to be first.</p>
+<div class="abcards">
+  <article><span class="abn">Daily</span><h3>Every startup that raised yesterday</h3><p>Across ${markets} markets and ${langs.size} languages, checked against the first public report of each round. Hundreds, not hundreds of thousands.</p></article>
+  <article><span class="abn">Complete</span><h3>Everything you need to reach out</h3><p>What the company does, where it is based, the amount and stage, the lead and other investors, the founders with their LinkedIn and X profiles, the company's website and socials, and what the money is for.</p></article>
+  <article><span class="abn">Actionable</span><h3>From list to outreach in minutes</h3><p>Filter, tick the startups that fit, and export them as a CSV, as a file ready for your CRM, or as LinkedIn notes with each founder's name filled in. Plus the top jobs at those startups. All free.</p></article>
+</div></section>
+<section class="block"><h2>Who it is for</h2>
+<div class="abwho">${who.map(([h, p]) => `<article><h3>${h}</h3><p>${p}</p></article>`).join("")}</div></section>
+<section class="block"><h2>How we deliver it</h2>
+<div class="abdeliver">${deliver.map(([h, p, href, cta]) => `<a class="abd" href="${href}"><h3>${h}</h3><p>${p}</p><span>${cta} →</span></a>`).join("")}</div></section>
+<section class="block"><h2>How it works</h2><p class="sub2">Six agents run in one automated pipeline, every day.</p>${pipe}</section>
 <section class="block"><h2>The process in detail</h2>
 <div class="pblocks">
 ${block("1 · Collect", "#f9a825", "Where the data comes from", `<p>We follow ${read.length} sources in ${markets} markets and ${langs.size} languages, listed in full below, plus ${searches} local-language news searches that pick up funding stories from outlets we do not follow directly.</p><p>They include startup and technology publications, business newspapers, regional startup media, investor and accelerator news pages, and press-release wires. We read each source's public feed or funding section, only where the publisher's robots.txt allows it, and never collect paywalled content.</p>`)}
@@ -577,11 +620,12 @@ ${block("5 · Analyse", "#8e24aa", "How we analyse it", `<p>Once the day's round
 ${block("6 · Limits", "#9aa3b2", "What we may miss", `<p>Our coverage is only as complete as the news. Some rounds are never announced publicly, appear only on social media, or are reported only behind a paywall. Some details, such as the amount or the investors, are never disclosed and stay blank here.</p><p>If you know of a round we missed or got wrong, <a href="mailto:dev@hackrlife.com?subject=Missing%20or%20wrong%20round%20on%20What%20Got%20Funded">tell us</a> and we will add or fix it.</p>`)}
 </div></section>
 <section class="block"><h2>Our sources</h2><p class="sub2">Open a region to see every source we follow there.</p>
+<div class="kpis2"><div><b>${read.length}</b><span>news sources</span></div><div><b>${searches}</b><span>local-language searches</span></div><div><b>${markets}</b><span>markets</span></div><div><b>${langs.size}</b><span>languages</span></div></div>
 <div class="regcards">
 ${cards}
 </div></section>
 </div>`;
-  return shell({ title: "About | What Got Funded", desc: `What Got Funded curates startup funding news from ${read.length} sources in ${markets} markets and analyses where the money is going.`, active: "About", body, canonical: "/about/" });
+  return shell({ title: "About | What Got Funded", desc: `Every startup that raised yesterday, with founders, investors and links, ready for sellers, SDRs, agencies, freelancers and software vendors to reach out. From ${read.length} sources in ${markets} markets.`, active: "About", body, canonical: "/about/" });
 }
 
 function subscribePage() {
