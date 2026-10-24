@@ -835,3 +835,4 @@ body.has-sel { padding-bottom: 90px; }
 .psub-x:hover { color: var(--ink); }
 .psub-done { border: 0; background: none; padding: 6px 0 0; font: inherit; font-size: 12.5px; color: var(--muted); text-decoration: underline; cursor: pointer; }
 @media (max-width: 700px) { .psub { padding: 12px 44px 10px 16px; } .psub p { font-size: 14px; } }
+.psub[hidden] { display: block !important; position: absolute; left: -9999px; width: 600px; visibility: hidden; }

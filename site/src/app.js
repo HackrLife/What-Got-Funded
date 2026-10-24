@@ -205,26 +205,37 @@
   var opens = 0;
   try { opens = Number(sessionStorage.getItem("wgf-opens")) || 0; } catch (e) { /* ignore */ }
   var formMeta = document.querySelector('meta[name="wgf-subscribe-form"]');
-  function subscribeCard(card) {
-    var old = panel.querySelector(".psub"); if (old) old.remove();
-    opens++; try { sessionStorage.setItem("wgf-opens", String(opens)); } catch (e) { /* ignore */ }
-    if (!formMeta || opens < 2 || store.get("wgf-subscribed")) return;
-    var hidUntil = Number(store.get("wgf-sub-hide")) || 0; if (Date.now() < hidUntil) return;
-    var nameEl = card.querySelector(".c-name"); var name = nameEl ? nameEl.textContent.trim() : "";
-    var jobs = card.classList.contains("jcard") || card.classList.contains("scard");
-    var box = document.createElement("div"); box.className = "psub";
-    var p = document.createElement("p");
-    if (jobs) p.innerHTML = "Get the top founding and leadership roles at newly funded startups in your inbox every day. <b>Free.</b>";
-    else { p.appendChild(document.createTextNode("Get startups like ")); var b = document.createElement("b"); b.textContent = name || "this one"; p.appendChild(b); p.appendChild(document.createTextNode(" in your inbox every day. Free.")); }
+  // The card and its Beehiiv form are built once, in the background after the page loads, and reused for every panel,
+  // so the form is already drawn when the card appears (a new embed each time took a few seconds to render).
+  var box = null, boxText = null;
+  function buildCard() {
+    if (box || !formMeta || store.get("wgf-subscribed")) return;
+    box = document.createElement("div"); box.className = "psub"; box.hidden = true;
+    boxText = document.createElement("p");
     var x = document.createElement("button"); x.type = "button"; x.className = "psub-x"; x.setAttribute("aria-label", "Hide for a week"); x.innerHTML = "&times;";
-    x.addEventListener("click", function () { store.set("wgf-sub-hide", String(Date.now() + 7 * 864e5)); box.remove(); });
+    x.addEventListener("click", function () { store.set("wgf-sub-hide", String(Date.now() + 7 * 864e5)); box.hidden = true; });
     var form = document.createElement("div"); form.className = "psub-form";
     var sc = document.createElement("script"); sc.async = true; sc.src = "https://subscribe-forms.beehiiv.com/v3/loader.js";
     sc.setAttribute("data-beehiiv-form", formMeta.getAttribute("content")); form.appendChild(sc);
     var done = document.createElement("button"); done.type = "button"; done.className = "psub-done"; done.textContent = "I'm already subscribed";
-    done.addEventListener("click", function () { store.set("wgf-subscribed", "1"); box.remove(); });
-    box.appendChild(x); box.appendChild(p); box.appendChild(form); box.appendChild(done);
+    done.addEventListener("click", function () { store.set("wgf-subscribed", "1"); box.hidden = true; });
+    box.appendChild(x); box.appendChild(boxText); box.appendChild(form); box.appendChild(done);
     panel.appendChild(box);
+  }
+  var idle = window.requestIdleCallback || function (f) { return setTimeout(f, 1200); };
+  if (document.readyState === "complete") idle(buildCard); else window.addEventListener("load", function () { idle(buildCard); });
+  function subscribeCard(card) {
+    opens++; try { sessionStorage.setItem("wgf-opens", String(opens)); } catch (e) { /* ignore */ }
+    buildCard();
+    if (!box) return;
+    box.hidden = true;
+    if (opens < 2 || store.get("wgf-subscribed") || Date.now() < (Number(store.get("wgf-sub-hide")) || 0)) return;
+    var nameEl = card.querySelector(".c-name"); var name = nameEl ? nameEl.textContent.trim() : "";
+    var jobs = card.classList.contains("jcard") || card.classList.contains("scard");
+    boxText.textContent = "";
+    if (jobs) { boxText.appendChild(document.createTextNode("Get the top founding and leadership roles at newly funded startups in your inbox every day. ")); var f = document.createElement("b"); f.textContent = "Free."; boxText.appendChild(f); }
+    else { boxText.appendChild(document.createTextNode("Get startups like ")); var b = document.createElement("b"); b.textContent = name || "this one"; boxText.appendChild(b); boxText.appendChild(document.createTextNode(" in your inbox every day. Free.")); }
+    box.hidden = false;
   }
   function close(pop) {
     if (wrap.hidden) return;
